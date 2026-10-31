@@ -80,6 +80,21 @@ ERR_BAD_RATE = "fx_bad_rate"
 ERR_BAD_DATE = "fx_bad_date"
 ERR_TOO_OLD = "fx_rate_too_old"
 
+#: The ONLY strings that may reach the browser's `error` field. A ValueError
+#: raised anywhere inside _fetch -- including from a library it calls -- would
+#: otherwise have its message copied verbatim into a public response. Audit
+#: injection of ValueError("audit-sentinel PRIVATE_RESPONSE_DETAIL") reproduced
+#: exactly that. An unrecognised code becomes ERR_UNREACHABLE.
+_PUBLIC_ERRORS = frozenset({
+    ERR_UNREACHABLE, ERR_BAD_RESPONSE, ERR_BAD_RATE, ERR_BAD_DATE, ERR_TOO_OLD,
+})
+
+
+def _public_error(exc: BaseException) -> str:
+    """Map any exception to a code from the fixed taxonomy. Never echoes text."""
+    code = str(exc)
+    return code if code in _PUBLIC_ERRORS else ERR_UNREACHABLE
+
 #: The lock guards the module's state ONLY. It is never held across the
 #: network call. An earlier version did hold it, which meant that during an
 #: upstream stall every caller queued behind a TIMEOUT_S fetch; because FastAPI
@@ -241,8 +256,12 @@ def _unavailable(code: str) -> Dict[str, Any]:
 
 
 def get_quote(force: bool = False) -> Dict[str, Any]:
-    """Display metadata for the current reference rate. Never raises, and never
-    blocks on the network while holding the module lock.
+    """Display metadata for the current reference rate.
+
+    Never raises for a transport or data fault -- those become a code from the
+    fixed taxonomy. Process-control exceptions (KeyboardInterrupt, SystemExit)
+    clean up and propagate rather than being swallowed. Never blocks on the
+    network while holding the module lock.
 
     Single-flight: at most one thread fetches at a time. Everyone else is served
     the cached quote, or an unavailable payload, *immediately* -- a stalled
@@ -269,44 +288,51 @@ def get_quote(force: bool = False) -> Dict[str, Any]:
     # ── network call happens OUTSIDE the lock ────────────────────────────────
     quote: Optional[Dict[str, Any]] = None
     err: Optional[str] = None
+    published = False
     try:
-        quote = _fetch()
-    except ValueError as e:
-        err = str(e)
-    except Exception:
-        # `_fetch` converts the transport errors it anticipates. Anything it
-        # did not must still be contained: this function's contract is that it
-        # never raises, and an escape here would leave `_fetching` set.
-        err = ERR_UNREACHABLE
-    finally:
-        # The single-flight flag is released unconditionally, including on an
-        # exception that is not an `Exception` at all. Without this, one escaped
-        # error wedges the adapter permanently -- every later caller sees a
-        # refresh "in progress" that will never finish, so the rate can never
-        # recover for the life of the process.
+        try:
+            quote = _fetch()
+        except ValueError as e:
+            err = _public_error(e)
+        except Exception as e:
+            # `_fetch` converts the transport errors it anticipates. Anything it
+            # did not must still be contained, and must not echo its text.
+            err = _public_error(e)
+
+        # Releasing ownership and publishing the result MUST be one transition.
+        # Previously the flag was cleared in its own `with _lock`, then the
+        # result published in a second one. A caller entering that gap started
+        # a second fetch whose newer result was then overwritten by this
+        # caller's older one -- reproduced deterministically by the review.
         with _lock:
             _fetching = False
+            published = True
+            if err is not None:
+                _last_error = err
+                _fail_streak = min(_fail_streak + 1, 8)
+                _failed_until = time.time() + min(
+                    BACKOFF_BASE_S * (2 ** (_fail_streak - 1)), BACKOFF_MAX_S)
+                if cache_snapshot is not None:
+                    # Keep serving the last VALIDATED quote, under the same
+                    # freshness bands, and say plainly that the refresh failed.
+                    # `snapshot_at` is NOT rewritten: a failed refresh of an old
+                    # observation is not a newly dated rate.
+                    return _render(cache_snapshot, snapshot_at, True, _last_error)
+                return _unavailable(_last_error)
 
-    with _lock:
-        if err is not None:
-            _last_error = err
-            _fail_streak = min(_fail_streak + 1, 8)
-            _failed_until = time.time() + min(
-                BACKOFF_BASE_S * (2 ** (_fail_streak - 1)), BACKOFF_MAX_S)
-            if cache_snapshot is not None:
-                # Keep serving the last VALIDATED quote, under the same
-                # freshness bands, and say plainly that the refresh failed.
-                # `snapshot_at` is NOT rewritten: a failed refresh of an old
-                # observation is not a newly dated rate.
-                return _render(cache_snapshot, snapshot_at, True, _last_error)
-            return _unavailable(_last_error)
-
-        _cache = quote
-        _cache_fetched_at = time.time()
-        _last_error = None
-        _fail_streak = 0
-        _failed_until = 0.0
-        return _render(_cache, _cache_fetched_at, False, None)
+            _cache = quote
+            _cache_fetched_at = time.time()
+            _last_error = None
+            _fail_streak = 0
+            _failed_until = 0.0
+            return _render(_cache, _cache_fetched_at, False, None)
+    finally:
+        # Safety net only: reached when the publication block above was never
+        # entered, e.g. a BaseException such as KeyboardInterrupt. Process
+        # control exceptions clean up here and then propagate.
+        if not published:
+            with _lock:
+                _fetching = False
 
 
 def approximate_usd(vnd: int, vnd_per_usd: str) -> Optional[str]:

@@ -25,6 +25,16 @@
   var STORAGE_KEY = 'rbf.lang';
   var catalogues = {};
   var current = DEFAULT;
+  /* F6.1: the language the reader last ASKED for. A catalogue request that
+   * resolves after a newer selection must not win -- previously, choosing
+   * Vietnamese then immediately English left the page Vietnamese, because the
+   * second call returned early while `current` was still English. */
+  var desired = DEFAULT;
+  /* F6.2: whether the language was chosen explicitly (URL or toggle) rather
+   * than defaulted. An explicit choice is carried in links and kept in the URL,
+   * including `lang=en`, so a recipient's saved preference cannot override an
+   * apparently-English link. */
+  var explicit = false;
 
   function isSupported(v) { return SUPPORTED.indexOf(v) !== -1; }
 
@@ -45,9 +55,9 @@
   function resolveInitial() {
     var p = null;
     try { p = new URLSearchParams(global.location.search).get('lang'); } catch (e) { p = null; }
-    if (isSupported(p)) return p;
+    if (isSupported(p)) { explicit = true; return p; }
     var s = readStored();
-    if (s) return s;
+    if (s) { explicit = true; return s; }
     return DEFAULT;
   }
 
@@ -129,33 +139,72 @@
   }
 
   /* Keep the address bar truthful without adding a history entry per toggle:
-   * replaceState, so Back still goes where the reader expects. */
+   * replaceState, so Back still goes where the reader expects.
+   * F6.2: `lang=en` is NOT deleted once the choice is explicit. Dropping it
+   * made a shared "English" link resolve to Vietnamese for anyone whose saved
+   * preference was Vietnamese. */
   function syncUrl() {
     try {
       var u = new URL(global.location.href);
-      if (current === DEFAULT) u.searchParams.delete('lang');
-      else u.searchParams.set('lang', current);
+      if (explicit) u.searchParams.set('lang', current);
+      else u.searchParams.delete('lang');
       global.history.replaceState(global.history.state, '', u.toString());
     } catch (e) { /* ignore */ }
   }
 
+  /* F6.2: carry the language across internal navigation.
+   * Storage alone is not enough -- it can be blocked, and the review's case
+   * was an unqualified href="/lab" resolving back to English. Query strings
+   * and fragments on the link are preserved; external and non-http links,
+   * downloads and explicit `lang=` links are left alone. */
+  function decorateLinks() {
+    if (!explicit) return;
+    var here;
+    try { here = new URL(global.location.href); } catch (e) { return; }
+    global.document.querySelectorAll('a[href]').forEach(function (a) {
+      var raw = a.getAttribute('href');
+      if (!raw || raw.charAt(0) === '#' || /^[a-z][a-z0-9+.-]*:/i.test(raw) === true &&
+          !/^https?:/i.test(raw)) return;
+      var u;
+      try { u = new URL(raw, here); } catch (e) { return; }
+      if (u.origin !== here.origin) return;            // external
+      if (a.hasAttribute('download')) return;
+      if (u.searchParams.get('lang') === current) return;
+      u.searchParams.set('lang', current);
+      a.setAttribute('href', u.pathname + u.search + u.hash);
+    });
+  }
+
   function set(lang, opts) {
-    if (!isSupported(lang) || lang === current) return Promise.resolve(current);
+    if (!isSupported(lang)) return Promise.resolve(current);
+
+    // Record the request even when it matches what is displayed: doing so
+    // cancels any pending switch to a different language.
+    desired = lang;
+    explicit = true;
+    if (lang === current) {
+      syncToggle();
+      syncUrl();
+      decorateLinks();
+      return Promise.resolve(current);
+    }
+
     /* Translated copy is a different length, so the document reflows and the
      * browser clamps the scroll offset. Capture and restore it, and keep focus
-     * where the reader left it. Exactness is not always possible -- if the page
-     * becomes shorter than the saved offset the restore is clamped too -- but
-     * the common case should not move at all. */
+     * where the reader left it. */
     var savedScroll = global.scrollY;
     var savedFocus = global.document.activeElement;
 
     return fetchCatalogue(lang).then(function () {
+      // A newer selection superseded this one while its catalogue loaded.
+      if (desired !== lang) return current;
       current = lang;
       if (!opts || opts.persist !== false) writeStored(lang);
       applyTo();
       applyDocumentMetadata();
       syncToggle();
       syncUrl();
+      decorateLinks();
       global.dispatchEvent(new CustomEvent('rbf:languagechange', { detail: { lang: current } }));
       if (global.scrollY !== savedScroll) global.scrollTo(0, savedScroll);
       if (savedFocus && savedFocus !== global.document.activeElement &&
@@ -180,11 +229,14 @@
     /* English is already in the markup, so load its catalogue too: dynamic
      * strings need lookups even when no switch has happened. */
     var needed = want === DEFAULT ? [DEFAULT] : [DEFAULT, want];
+    desired = want;
     return Promise.all(needed.map(fetchCatalogue)).then(function () {
       current = want;
       applyTo();
       applyDocumentMetadata();
       syncToggle();
+      syncUrl();
+      decorateLinks();
       wireToggle();
       global.dispatchEvent(new CustomEvent('rbf:languagechange', { detail: { lang: current } }));
       return current;
@@ -195,6 +247,7 @@
     t: t,
     set: set,
     apply: applyTo,
+    decorateLinks: decorateLinks,
     get lang() { return current; },
     supported: SUPPORTED.slice(),
     ready: null

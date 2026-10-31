@@ -6,6 +6,7 @@ oracle: a provider outage must not turn this suite red.
 """
 import http.client
 import json
+from decimal import Decimal
 import threading
 import time
 import urllib.error
@@ -286,6 +287,93 @@ def test_httpexception_is_converted_by_fetch_not_leaked(monkeypatch):
     assert fx._fetching is False
 
 
+def test_release_and_publish_happen_in_one_lock_transition(monkeypatch):
+    """F3. Ownership of the single flight and publication of its result must be
+    one transition.
+
+    When they were two, a caller entering the gap started a second fetch whose
+    newer result was then overwritten by the first caller's older one. The lock
+    wrapper below schedules a thread into exactly that boundary.
+    """
+    paused, resume = threading.Event(), threading.Event()
+
+    class BoundaryLock:
+        def __init__(self):
+            self.lock = threading.Lock()
+            self.exits = 0
+
+        def __enter__(self):
+            self.lock.acquire()
+            return self
+
+        def __exit__(self, *a):
+            first = threading.current_thread().name == "first"
+            if first:
+                self.exits += 1
+            boundary = first and self.exits == 2
+            self.lock.release()
+            if boundary:
+                paused.set()
+                if not resume.wait(3):
+                    raise RuntimeError("test synchronization timeout")
+
+    real_lock = fx._lock
+    fx._lock = BoundaryLock()
+    fetches = []
+
+    def fake_fetch():
+        rate = Decimal("25000" if threading.current_thread().name == "first" else "26000")
+        fetches.append(str(rate))
+        return {"rate": rate, "reference_date": fx._utc_today().isoformat()}
+
+    monkeypatch.setattr(fx, "_fetch", fake_fetch)
+    results = {}
+    t = threading.Thread(name="first", target=lambda: results.update(first=fx.get_quote()))
+    t.start()
+    try:
+        if not paused.wait(3):
+            # The boundary never occurred: there is no two-transition gap left.
+            t.join(3)
+            assert fetches == ["25000"]
+            return
+        results["second"] = fx.get_quote()
+        resume.set()
+        t.join(3)
+        assert not t.is_alive()
+        # The second caller must NOT have started a competing fetch...
+        assert fetches == ["25000"], f"a second fetch started in the gap: {fetches}"
+        # ...and the published cache must be the value that was actually fetched.
+        assert str(fx._cache["rate"]) == "25000"
+    finally:
+        resume.set()
+        fx._lock = real_lock
+
+
+@pytest.mark.parametrize("message", [
+    "audit-sentinel PRIVATE_RESPONSE_DETAIL",
+    "/Users/someone/secret/path.json",
+    "connection to 10.0.0.5:5432 refused",
+])
+def test_unexpected_valueerror_text_never_reaches_the_public_error(monkeypatch, message):
+    """F4. A ValueError raised anywhere inside _fetch -- including from a
+    library it calls -- had its message copied verbatim into the public `error`
+    field. Only codes from the fixed taxonomy may appear."""
+    monkeypatch.setattr(fx, "_fetch", lambda: (_ for _ in ()).throw(ValueError(message)))
+    q = fx.get_quote()
+    blob = json.dumps(q)
+    assert message not in blob, "exception text leaked into the response"
+    assert q["error"] in fx._PUBLIC_ERRORS
+    assert q["error"] == fx.ERR_UNREACHABLE
+
+
+def test_known_codes_still_pass_through_the_taxonomy(monkeypatch):
+    """The allowlist must not flatten the real codes into one."""
+    for code in (fx.ERR_BAD_RATE, fx.ERR_BAD_DATE, fx.ERR_BAD_RESPONSE):
+        fx._reset_for_tests()
+        monkeypatch.setattr(fx, "_fetch", lambda c=code: (_ for _ in ()).throw(ValueError(c)))
+        assert fx.get_quote()["error"] == code
+
+
 def test_the_module_lock_is_not_held_across_network_io(monkeypatch):
     """The finding this guards: a stalled upstream must cost one thread, not
     the worker pool. FastAPI runs sync endpoints in a bounded threadpool, so a
@@ -364,3 +452,18 @@ def test_live_smoke():
     """Connectivity demonstration only. Never an oracle for correctness."""
     q = fx.get_quote(force=True)
     assert q["status"] in (fx.STATUS_OK, fx.STATUS_STALE, fx.STATUS_UNAVAILABLE)
+
+
+@pytest.mark.parametrize("vnd,rate,expected", [
+    (25125, "25000", "1.01"),      # exact tie -> half-up
+    (1, "8", "0.13"),              # 0.125 -> half-up
+    (0, "25000", "0.00"),
+    (185_000_000, "25807", "7168.60"),
+    (222_000_000, "25765", "8616.34"),
+])
+def test_browser_and_backend_agree_on_cents(vnd, rate, expected):
+    """F5. The browser previously used binary float Math.round while claiming
+    agreement with this function, and disagreed on exact ties. These fixtures
+    are pinned identically in tools/check_i18n_fx_state.cjs; if either side
+    changes its rounding, one of the two suites fails."""
+    assert fx.approximate_usd(vnd, rate) == expected
