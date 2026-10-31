@@ -80,3 +80,90 @@ names, findings, metric definitions). **102 of 436 visible text nodes on the Lab
 page remain English in Vietnamese mode** as a result. Keying it means changing
 the shape of an API response that renders registered research output, which is a
 broader change than this task authorises. Reported, not attempted.
+
+---
+
+# Appendix — 31 October 2026 review corrections
+
+The record above is retained as written. It described the branch at `ae8d778`
+and is now inaccurate in three particulars, corrected here rather than edited
+in place: the branch **has** been pushed (backup only, authorised; no merge or
+deploy), the backend suite is no longer 599 tests, and the FX suite is no
+longer 42.
+
+## Findings reproduced before any edit
+
+All eight findings in the 31 Oct review were reproduced first, using the
+review's own two scripts plus direct inspection for F1 and F7. Reproducing a
+defect is not the same as satisfying an acceptance gate, and is not claimed as
+such.
+
+## Corrected
+
+| Finding | State |
+|---|---|
+| F1 — USD not connected to any page | **Fixed.** Adapter loaded on all three pages; amounts bind their authoritative integer in `data-vnd`; display control and dated attribution added |
+| F2 — no refresh or ageing on a long-lived page | **Fixed in logic, partially verified.** Client recomputes age from the reference date against the current UTC day; hourly refresh, visibility/focus revalidation, single in-flight refresh, stale-response guard |
+| F3 — refresh completion not atomic | **Fixed.** Release and publish are one lock transition |
+| F4 — ValueError text escaped the taxonomy | **Fixed.** Fixed allowlist; anything else becomes `fx_unreachable` |
+| F5 — browser used binary float, not decimal | **Fixed.** BigInt integer arithmetic; five fixtures pinned on both sides |
+| F6 — language race and lost URL preference | **Fixed.** Desired-language token; explicit language carried into same-origin links; `lang=en` retained |
+| F7 — Vietnamese Lab coverage and dynamic state | **OPEN.** Not attempted |
+| F8 — evidence inaccurate | This appendix |
+
+## Verification actually executed
+
+| | |
+|---|---|
+| Backend (`--ignore=test_lab_browser.py`) | **618 passed, 2 skipped** |
+| Simulation | **651 passed** |
+| Node prototype-state | **7 passed** |
+| Node i18n/FX state (new) | **11 passed** |
+| Catalogue parity | **583 / 583**, every reference resolves |
+| Protected files vs `b3683e5` | **30 checked, 0 changed** |
+
+The skipped backend tests are the missing-ensemble artifact and the live FX
+smoke test (run separately and passing). One Node test was removed rather than
+left hanging: the harness holds a single unresolved catalogue request, so a
+second delayed fetch overwrote its release closure. The single-pending case
+covers the same defect; a multi-pending version needs a per-request resolver.
+
+## Browser checks executed
+
+Against a local preview on this machine, with the live `/api/fx` quote
+(reference date 2026-10-30).
+
+- **demo, Vietnamese, 360 / 390 / 768 / 1440px** — no horizontal overflow at
+  any width; 3 bound amounts each carrying a USD line; language switch usable.
+- **lab, Vietnamese, 390 / 1440px** — no horizontal overflow; 8 bound amounts;
+  Vietnamese attribution line.
+- Browser and backend agree exactly: 185,000,000 → 7180.28, 333,000,000 →
+  12924.51, 382,950,000 → 14863.19, 222,000,000 → 8616.34.
+- VND-only removes the USD lines and the note while VND stays primary.
+- Vietnamese renders its own number format (`7.180,28`).
+
+**A regression was found and fixed during these checks.** At 390px the
+Vietnamese prototype header overflowed its viewport by 13px, caused by the
+language switch this work added to a header that has no mobile menu to fall
+back to. Hiding the control would have stranded a Vietnamese reader on a phone,
+so it now wraps and shrinks instead.
+
+A stale browser stylesheet cache initially made the fix appear ineffective.
+The rule was confirmed absent from the loaded sheet before any further change
+was made, rather than the CSS being rewritten against a false negative.
+
+## Not executed — no claim made
+
+- The nine Playwright Lab browser tests. Still not run.
+- VoiceOver and all screen-reader behaviour. Not run, by instruction.
+- English-language viewport matrix; Vietnamese was checked as the harder case.
+- `index.html` at the full viewport matrix.
+- No production request, submission, login, payment, deployment or merge.
+
+## Remaining gap
+
+**F7 is open and Vietnamese coverage is not complete.** `backend/lab.py` emits
+user-visible English prose through four read-only endpoints — 86 prose-bearing
+fields — leaving roughly 102 of 436 visible Lab text nodes English in
+Vietnamese mode. The additive `*_key` approach is specified and authorised but
+not implemented.
