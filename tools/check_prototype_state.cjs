@@ -52,6 +52,12 @@ function setup() {
     setElText: (el, key, vars) => { if (el) el.textContent = translate(key, vars); },
     setI18nText: (id, key, vars) => { get(id).textContent = translate(key, vars); },
     VERDICT: { APPROVED:'demo.verdict.approved' },
+    // Money writes route through setMoney(), which also binds data-vnd for the
+    // USD pass. The harness records the bound integer so tests can assert the
+    // authoritative number, not the formatted text.
+    bindMoney: (el, vnd) => { if (el) el.attrs = Object.assign(el.attrs||{}, {'data-vnd': String(vnd)}); },
+    setMoney: (id, vnd) => { const e = get(id); e.textContent = String(vnd);
+                             e.attrs = Object.assign(e.attrs||{}, {'data-vnd': String(vnd)}); },
     // Display labels for the engine's own tier values, keyed like the page.
     // An unrecognised tier falls through to the API's own string.
     TIER_LABEL: { 'Low Risk':'demo.tier.low', 'Medium Risk':'demo.tier.medium',

@@ -560,9 +560,12 @@ def test_page_loads_no_framework_or_third_party_asset():
     # Two scripts now: the first-party i18n runtime, then the page's own inline
     # client. Still hand-written, still no third party -- which is what this
     # guard is actually about.
-    assert html.count("<script") == 2
+    # Three scripts now: the i18n runtime, the FX display adapter, then the
+    # page's own inline client. Still hand-written, still no third party.
+    assert html.count("<script") == 3
     assert '<script src="/i18n.js" defer></script>' in html
-    assert "src=" not in html.split("<script")[2].split(">")[0], (
+    assert '<script src="/fx-display.js" defer></script>' in html
+    assert "src=" not in html.split("<script")[3].split(">")[0], (
         "the page's own client must stay inline"
     )
 

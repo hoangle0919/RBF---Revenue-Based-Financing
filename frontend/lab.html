@@ -250,6 +250,7 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
 </style>
 <link rel="stylesheet" href="/institutional.css">
 <script src="/i18n.js" defer></script>
+<script src="/fx-display.js" defer></script>
 </head>
 <body class="lab-shell">
 <a class="skip" href="#main" data-i18n="chrome.skip">Skip to content</a>
@@ -339,7 +340,8 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
     <div class="arms" id="arms"></div>
   </section>
 
-  <div class="legend" id="legend" aria-label="Contract colours" data-i18n-attr="aria-label:lab.legend.label"></div>
+  <div class="fx-switch" role="group" aria-label="Amount display" data-i18n-attr="aria-label:fx.display.label" style="margin:10px 0 4px"><button type="button" data-fx-option="vnd" aria-pressed="false" data-i18n="fx.display.vnd">VND only</button><span class="lang-sep" aria-hidden="true">/</span><button type="button" data-fx-option="dual" aria-pressed="true" data-i18n="fx.display.dual">VND + ≈ USD</button></div><p class="fx-note" data-fx-note aria-live="polite"></p>
+<div class="legend" id="legend" aria-label="Contract colours" data-i18n-attr="aria-label:lab.legend.label"></div>
 
   <section id="s-burden" aria-labelledby="h-burden">
     <div class="card">
@@ -692,8 +694,8 @@ function renderArms(arms){
       '<dl style="margin:8px 0 0">'+
         kv(t('lab.arm.capFactor',"Cap factor"),
            a.cap_factor==null?t('lab.value.none',"none"):"×"+num(a.cap_factor,4))+
-        kv(t('lab.arm.advance',"Advance"), a.principal.display)+
-        kv(a.repayment_target.label, a.repayment_target.amount.display)+
+        kvMoney(t('lab.arm.advance',"Advance"), a.principal)+
+        kvMoney(a.repayment_target.label, a.repayment_target.amount)+
         kv(a.apr_label, apr(a))+
         kv(a.duration_label, dur(a))+
         // A-9 / D-050: the two denominators are different quantities, so both
@@ -727,10 +729,21 @@ function renderArms(arms){
       '</b> '+esc(a.apr_basis)+'</p>'+
       '</details></article>';
   }).join("");
+
+  /* F1: these rows are rebuilt wholesale, so the USD pass must run again
+   * over the new nodes. render() reads data-vnd, never the text. */
+  if (window.RBF_FX) window.RBF_FX.render();
 }
 // Labels this page owns arrive here already translated; API-supplied labels
 // (repayment target, rate, duration) are passed through as they arrive.
 function kv(k,v){return '<div class="kv"><dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd></div>';}
+/* F1: money rows carry their authoritative integer VND. lab.py's _fmt_money
+ * already returns {vnd, display}, so the number is bound directly and the
+ * formatted string is never parsed back. */
+function kvMoney(k,m){
+  if(!m||m.vnd==null) return kv(k, m&&m.display?m.display:'—');
+  return '<div class="kv"><dt>'+esc(k)+'</dt><dd data-vnd="'+String(Math.round(Number(m.vnd)))+'">'+esc(m.display)+'</dd></div>';
+}
 
 function renderLegend(arms){
   el("legend").innerHTML=arms.map(function(a){

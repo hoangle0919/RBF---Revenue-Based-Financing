@@ -16,6 +16,7 @@
 <link rel="preload" href="/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/fraunces-latin.woff2" as="font" type="font/woff2" crossorigin>
 <script src="/i18n.js" defer></script>
+<script src="/fx-display.js" defer></script>
 <style>
 /* Self-hosted fonts (Google Fonts woff2, subset: latin, latin-ext, vietnamese) */
 /* Archivo — vietnamese */
@@ -849,6 +850,8 @@ tr{cursor:pointer}tbody tr:hover td{background:var(--paper)}
     </div>
     <div class="result-section"><h3 data-i18n="demo.structureFinancing">Structure the financing</h3>
       <div class="preview-list" id="structure-list"></div>
+      <div class="fx-switch" role="group" aria-label="Amount display" data-i18n-attr="aria-label:fx.display.label" style="margin-top:12px"><button type="button" data-fx-option="vnd" aria-pressed="false" data-i18n="fx.display.vnd">VND only</button><span class="lang-sep" aria-hidden="true">/</span><button type="button" data-fx-option="dual" aria-pressed="true" data-i18n="fx.display.dual">VND + ≈ USD</button></div>
+      <p class="fx-note" data-fx-note aria-live="polite" style="margin-top:6px"></p>
       <p class="small" id="structure-note" style="margin-top:12px"></p>
     </div>
     <div class="result-section" id="scenario-section"><h3 data-i18n="demo.result.scenariosTitle">Test downside scenarios</h3>
@@ -993,6 +996,24 @@ async function callAPI(endpoint, options = {}) {
     console.warn('Prototype request unavailable', {route:endpoint.split('?')[0]});
     return null;
   }
+}
+/* F1: every money cell carries its authoritative integer VND in `data-vnd`,
+ * which is what fx-display.js converts. The rendered text is never parsed back
+ * into a number -- locale formatting differs between languages, the underlying
+ * amount does not. A non-finite or non-integer value clears the binding rather
+ * than publishing a figure we cannot convert exactly. */
+function bindMoney(el, vnd) {
+  if (!el) return;
+  const n = Number(vnd);
+  if (Number.isFinite(n) && Math.floor(n) === n && n >= 0) el.setAttribute('data-vnd', String(n));
+  else el.removeAttribute('data-vnd');
+}
+function setMoney(id, vnd) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = fmtVND(vnd);
+  bindMoney(el, vnd);
+  if (window.RBF_FX) window.RBF_FX.render();
 }
 const fmtVND = n => {
   if (n === '' || n === null || n === undefined || isNaN(n)) return '—';
@@ -1141,7 +1162,7 @@ function next(step){
 function back(step){ showStep(step-1); }
 function renderPreview(){
   const rows=[[t('demo.preview.shop'),applyData.shop_name],[t('demo.field.platform'),applyData.platform],[t('demo.field.monthlyRevenue'),fmtVND(applyData.monthly_revenue)],[t('demo.field.revenueGrowth'),signed(applyData.revenue_growth)],[t('demo.field.returnRate'),pct(applyData.return_rate)],[t('demo.field.lateShipments'),pct(applyData.late_ship_rate)],[t('demo.preview.rating'),applyData.rating+' / 5.0'],[t('demo.field.daysActive'),applyData.days_active+' '+t('demo.unit.days')]];
-  document.getElementById('preview-list').innerHTML=rows.map(r=>`<div class="preview-row"><span>${r[0]}</span><span>${r[1]}</span></div>`).join('');
+  document.getElementById('preview-list').innerHTML=rows.map(r=>`<div class="preview-row"><span>${r[0]}</span><span${r[2]!=null&&Number.isFinite(+r[2])?` data-vnd="${Math.round(+r[2])}"`:''}>${r[1]}</span></div>`).join('');
 }
 const DECISION_STEPS=['demo.seq.read','demo.seq.normalize','demo.seq.stability','demo.seq.score','demo.seq.structure','demo.seq.scenarios','demo.seq.ready'];
 async function runDecisionSequence(){
@@ -1190,9 +1211,9 @@ function renderResult(s){
   document.getElementById('r-verdict').textContent=VERDICT[dec]?t(VERDICT[dec]):dec;
   document.getElementById('r-shop').textContent=s.shop_name||t('demo.merchant');
   document.getElementById('r-plat').textContent=s.platform?' · '+s.platform:'';
-  document.getElementById('r-limit').textContent=fmtVND(structure.amount_used_for_structure||structure.recommended_amount);
+  setMoney('r-limit', structure.amount_used_for_structure||structure.recommended_amount);
   document.getElementById('r-rate').textContent=structure.remittance_pct?pct(structure.remittance_pct)+' '+t('demo.hero.ofRevenue'):'—';
-  document.getElementById('r-cap').textContent=fmtVND(structure.repayment_cap);
+  setMoney('r-cap', structure.repayment_cap);
   document.getElementById('r-pd').textContent=pct(s.pd_score);
   // The scorer's legacy free-text rationale uses a different advance rule.
   // Do not present it as the rationale for the financing figures shown here.
@@ -1206,19 +1227,20 @@ function renderResult(s){
 }
 function renderStructure(structure, financing){
   const rows=[];
-  rows.push([t('demo.field.advance'), fmtVND(structure.recommended_amount)]);
+  rows.push([t('demo.field.advance'), fmtVND(structure.recommended_amount), structure.recommended_amount]);
   if(structure.requested_amount) rows.push([t('demo.field.requestedAmount'), fmtVND(structure.requested_amount)+(structure.exceeds_recommendation?' '+t('demo.structure.exceeds'):'')]);
   rows.push([t('demo.field.remittance'), structure.remittance_pct?pct(structure.remittance_pct)+' '+t(structure.collection_base==='net_of_returns'?'demo.structure.ofMonthlyNet':'demo.structure.ofMonthly'):'—']);
   if(structure.collection_base==='net_of_returns' && structure.net_collectible_revenue!=null)
-    rows.push([t('demo.structure.collectedOn',{pct:pct(structure.return_rate_applied||0,1)}), fmtVND(structure.net_collectible_revenue)]);
-  rows.push([t('demo.field.repaymentCap'), fmtVND(structure.repayment_cap)]);
+    rows.push([t('demo.structure.collectedOn',{pct:pct(structure.return_rate_applied||0,1)}), fmtVND(structure.net_collectible_revenue), structure.net_collectible_revenue]);
+  rows.push([t('demo.field.repaymentCap'), fmtVND(structure.repayment_cap), structure.repayment_cap]);
   rows.push([t('demo.structure.baseTerm'), structure.base_case_duration_months?structure.base_case_duration_months+' '+t('demo.unit.months'):'—']);
   rows.push([t('demo.structure.aprBase'), structure.effective_apr_base_case!=null?pct(structure.effective_apr_base_case,1):'—']);
   rows.push([t('demo.structure.factorRate'), structure.factor_rate?structure.factor_rate.toFixed(2)+'×':'—']);
   const severe=(financing.scenarios||[]).find(sc=>sc.case==='severe_decline');
   rows.push([t('demo.structure.downsideTerm'), severe&&severe.repayment_duration_months?severe.repayment_duration_months+' '+t('demo.unit.months'):'—']);
   rows.push([t('demo.structure.dataCompleteness'), financing.data_completeness_pct!=null?financing.data_completeness_pct+'%':'—']);
-  document.getElementById('structure-list').innerHTML=rows.map(r=>`<div class="preview-row"><span>${r[0]}</span><span>${r[1]}</span></div>`).join('');
+  document.getElementById('structure-list').innerHTML=rows.map(r=>`<div class="preview-row"><span>${r[0]}</span><span${r[2]!=null&&Number.isFinite(+r[2])?` data-vnd="${Math.round(+r[2])}"`:''}>${r[1]}</span></div>`).join('');
+  if (window.RBF_FX) window.RBF_FX.render();
   const note=document.getElementById('structure-note');
   let noteTxt;
   if(structure.note){ noteTxt=structure.note; }
@@ -1360,7 +1382,7 @@ async function loadPortfolio(){
   sellers=data.sellers; stats=data.stats;
   renderStats(); renderCounts(); renderCharts(); renderTable();
 }
-function renderStats(){ document.getElementById('st-total').textContent=stats.total; document.getElementById('st-approval').textContent=Math.round(stats.approval_rate*100)+'%'; document.getElementById('st-exposure').textContent=fmtVND(stats.total_exposure); document.getElementById('st-pd').textContent=pct(stats.avg_pd); const t=document.getElementById('traffic-line'); if(t){ const I=window.RBF_I18N||{t:()=>''}; const last=stats.last_visit?new Date(stats.last_visit).toLocaleString():'—'; t.innerHTML=`<b>${stats.visits_total||0}</b> ${I.t('demo.dash.visits')} · <b>${stats.visits_today||0}</b> ${I.t('demo.dash.today')} · <b>${stats.live_submissions||0}</b> ${I.t('demo.dash.submittedExamples')} · ${I.t('demo.dash.lastVisit')} ${last}`; } }
+function renderStats(){ document.getElementById('st-total').textContent=stats.total; document.getElementById('st-approval').textContent=Math.round(stats.approval_rate*100)+'%'; setMoney('st-exposure', stats.total_exposure); document.getElementById('st-pd').textContent=pct(stats.avg_pd); const t=document.getElementById('traffic-line'); if(t){ const I=window.RBF_I18N||{t:()=>''}; const last=stats.last_visit?new Date(stats.last_visit).toLocaleString():'—'; t.innerHTML=`<b>${stats.visits_total||0}</b> ${I.t('demo.dash.visits')} · <b>${stats.visits_today||0}</b> ${I.t('demo.dash.today')} · <b>${stats.live_submissions||0}</b> ${I.t('demo.dash.submittedExamples')} · ${I.t('demo.dash.lastVisit')} ${last}`; } }
 function renderCounts(){ document.getElementById('c-all').textContent=stats.total; document.getElementById('c-approved').textContent=stats.approved; document.getElementById('c-conditional').textContent=stats.conditional; document.getElementById('c-rejected').textContent=stats.rejected; document.getElementById('c-live').textContent=sellers.filter(s=>s.source==='live').length; }
 function drawDonut(elId,data){ const total=data.reduce((s,d)=>s+d.value,0)||1; let offset=0, r=38, cx=50, cy=50, circ=2*Math.PI*r; const slices=data.map(d=>{ const p=d.value/total; const sl=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="16" stroke-dasharray="${p*circ} ${circ}" stroke-dashoffset="${-offset*circ}" transform="rotate(-90 ${cx} ${cy})"/>`; offset+=p; return sl; }); document.getElementById(elId).innerHTML=`<svg viewBox="0 0 100 100" style="width:124px;height:124px">${slices.join('')}<circle cx="50" cy="50" r="29" fill="#FFFFFF" stroke="#E8E8E5" stroke-width="1"/><text x="50" y="54" text-anchor="middle" font-family="Spline Sans Mono" font-size="15" fill="#1A1A1A">${total}</text></svg>`; }
 function renderCharts(){ const dist=[{label:t('demo.chart.lowRisk'),value:stats.approved,color:'#2E6B4F'},{label:t('demo.chart.mediumRisk'),value:stats.conditional,color:'#8A6D3B'},{label:t('demo.chart.highRisk'),value:stats.rejected,color:'#8C3A38'}]; drawDonut('donut',dist); document.getElementById('donut-legend').innerHTML=dist.map(d=>`<div class="leg"><span class="sw" style="background:${d.color}"></span>${d.label}<b>${d.value}</b></div>`).join(''); const plats=['Shopee','TikTok Shop','Lazada']; const counts=plats.map(p=>sellers.filter(s=>s.platform===p).length), max=Math.max(...counts,1); document.getElementById('platform-bars').innerHTML=plats.map((p,i)=>`<div><div class="bl"><span>${p}</span><b>${counts[i]}</b></div><div class="bar-track"><div class="bar-fill" style="width:${counts[i]/max*100}%"></div></div></div>`).join(''); }
@@ -1501,7 +1523,7 @@ function heroReadValues(){
   };
 }
 function heroUpdateLabels(v){
-  document.getElementById('hv-rev').textContent=fmtVND(v.monthly_revenue);
+  setMoney('hv-rev', v.monthly_revenue);
   document.getElementById('hv-growth').textContent=signed(v.revenue_growth);
   document.getElementById('hv-return').textContent=pct(v.return_rate);
   document.getElementById('hv-rating').textContent=v.rating.toFixed(1);
@@ -1522,13 +1544,13 @@ function heroRenderDecision(d, ms){
      (D-001). Labelling it a PD would assert predictive validity that this
      project has withdrawn. */
   document.getElementById('hd-pdline').textContent=(d.pd_score!=null)?t('demo.hero.demoScoreLine',{v:pct(d.pd_score,1)}):'';
-  document.getElementById('hd-limit').textContent=fmtVND(structure.amount_used_for_structure||structure.recommended_amount);
+  setMoney('hd-limit', structure.amount_used_for_structure||structure.recommended_amount);
   /* A-1: say which base, or the merchant cannot reconcile the figure —
      it is deliberately below remittance_pct x gross revenue. */
   document.getElementById('hd-rate').textContent=structure.remittance_pct
     ?pct(structure.remittance_pct)+' '+t(structure.collection_base==='net_of_returns'?'demo.hero.ofNetRevenue':'demo.hero.ofRevenue')
     :'—';
-  document.getElementById('hd-pd').textContent=fmtVND(structure.repayment_cap);
+  setMoney('hd-pd', structure.repayment_cap);
   const dur=structure.base_case_duration_months;
   document.getElementById('hd-dur').textContent=dur?dur+' '+t(dur===1?'demo.unit.month':'demo.unit.months'):'—';
   /* The factor rate alone hides the price: the same 1.15 costs far more over

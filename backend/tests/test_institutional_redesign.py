@@ -86,6 +86,7 @@ def test_homepage_has_no_inline_api_or_scoring_dependencies(homepage):
     # Two first-party deferred scripts, in this order: the i18n runtime must be
     # parsed before overview.js, which reads RBF_I18N for the diagram copy.
     assert scripts == [{"src": "/i18n.js", "defer": None},
+                       {"src": "/fx-display.js", "defer": None},
                        {"src": "/overview.js", "defer": None}]
     assert not any(name.startswith("on") for _, attrs in homepage.elements for name in attrs)
     script = (FRONTEND / "overview.js").read_text()
@@ -174,7 +175,11 @@ def test_full_example_and_dashboard_keep_demonstration_boundaries():
         assert label in dashboard
     # Label clarification must not substitute a different measure or change the
     # existing API bindings, including the legacy amounts in stored records.
-    assert "document.getElementById('st-exposure').textContent=fmtVND(stats.total_exposure)" in source
+    # The write now routes through setMoney(), which sets the same text AND
+    # binds the authoritative integer for the USD pass. The binding this guard
+    # protects is unchanged: the figure still comes from stats.total_exposure.
+    assert "setMoney('st-exposure', stats.total_exposure)" in source
+    assert "el.textContent = fmtVND(vnd)" in source, "setMoney must still format VND"
     assert '<td class="t-num">${fmtVND(s.credit_limit)}</td>' in source
     # The scorer's legacy rationale uses a different advance rule. Neither
     # result surface may republish it as the financing explanation.
