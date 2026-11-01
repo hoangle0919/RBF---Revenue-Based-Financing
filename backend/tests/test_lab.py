@@ -832,8 +832,16 @@ def test_fully_incomplete_arms_report_duration_undefined_but_keep_their_rate():
 
 def test_the_page_renders_the_api_supplied_labels_not_fixed_ones():
     html = open(LAB_HTML, encoding="utf-8").read()
-    assert "kv(a.apr_label," in html and "kv(a.duration_label," in html
+    # The label still comes from the API. It is now routed through the
+    # additive resolver, which prefers the API's `<field>_key` translation and
+    # falls back to the API's own English `<field>` when no catalogue entry
+    # resolves -- so the page still never carries its own fixed label.
+    assert "kv(apiText(a,'apr_label')" in html
+    assert "kv(apiText(a,'duration_label')" in html
     assert 'kv("Mean simulated APR"' not in html
+    assert "return obj[field] == null ? '' : obj[field];" in html, (
+        "apiText must fall back to the API's own English field, not to a literal"
+    )
 
 
 def test_metric_definitions_disclose_the_conditioning_of_each_mean():
@@ -937,7 +945,8 @@ def test_arm_disclosure_carries_the_api_supplied_basis():
     averages", which left the rate's basis unrendered entirely.
     """
     js = open(LAB_HTML, encoding="utf-8").read()
-    assert "a.duration_basis" in js and "a.apr_basis" in js
+    assert "apiText(a,'duration_basis')" in js
+    assert "apiText(a,'apr_basis')" in js
     assert "How the duration mean is computed" in js
     assert "How the rate is computed" in js
     assert "How these averages are computed" not in js, (

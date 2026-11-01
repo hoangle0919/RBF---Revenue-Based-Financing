@@ -622,7 +622,7 @@ async function getJSON(url){
 /* ── provenance (one block, at the end) ─────────────────────── */
 function renderProvenance(m){
   var rows=m.artifacts.map(function(a){
-    return '<tr><th scope="row">'+esc(a.role)+'</th>'+
+    return '<tr><th scope="row">'+esc(apiText(a,'role'))+'</th>'+
       '<td style="font-size:.76rem">'+esc(a.artifact)+'</td>'+
       '<td style="font-size:.72rem;word-break:break-all">'+esc(a.sha256||"—")+'</td>'+
       '<td>'+esc(a.n_paths)+'</td><td>'+esc(a.base_seed)+'</td></tr>';
@@ -638,13 +638,20 @@ function renderProvenance(m){
      malformed spec_version previously produced "Simulation output under ." */
   var spec=(m.artifacts[0]||{}).spec_version;
   if(typeof spec==="string" && spec.trim()) el("foot-spec").textContent=spec.trim();
-  el("glossary").innerHTML=Object.keys(m.glossary).map(function(k){
-    return '<dt>'+esc(k)+'</dt><dd>'+esc(m.glossary[k])+'</dd>';
+  /* The glossary TERM is reader-facing copy, not an identifier, so both the
+     term and its definition come from the keyed list. `m.glossary` is still
+     emitted and is used as the fallback when the keyed list is absent. */
+  var gloss=m.glossary_keyed||Object.keys(m.glossary).map(function(k){
+    return {term:k, text:m.glossary[k]};
+  });
+  el("glossary").innerHTML=gloss.map(function(g){
+    return '<dt>'+esc(apiText(g,'term'))+'</dt><dd>'+esc(apiText(g,'text'))+'</dd>';
   }).join("");
   el("taxonomy").innerHTML=Object.keys(m.claim_taxonomy).map(function(k){
+    var c=m.claim_taxonomy[k];
     return '<p style="font-size:.84rem;color:var(--muted);margin:10px 0 0">'+
-      '<span class="cls cls-'+esc(k)+'">'+esc(m.claim_taxonomy[k].label)+'</span><br>'+
-      esc(m.claim_taxonomy[k].meaning)+'</p>';
+      '<span class="cls cls-'+esc(k)+'">'+esc(apiText(c,'label'))+'</span><br>'+
+      esc(apiText(c,'meaning'))+'</p>';
   }).join("");
 }
 
@@ -670,7 +677,7 @@ function renderScenarios(list){
         'aria-label="'+esc(t('lab.scn.groupLabel',"{family} scenarios",{family:familyLabel(f)}))+'">'+
         byFam[f].map(function(s){
           return '<button type="button" aria-pressed="false" data-k="'+esc(s.key)+'">'+
-            esc(s.label)+'</button>';}).join("")+'</div></div>';
+            esc(apiText(s,'label'))+'</button>';}).join("")+'</div></div>';
     }).join("");
   Array.prototype.forEach.call(document.querySelectorAll("#scn-groups button"),function(b){
     b.addEventListener("click",function(){select(b.dataset.k);});
@@ -682,7 +689,37 @@ function markSelected(key){
 }
 
 /* ── arms ───────────────────────────────────────────────────── */
+/* F7: renderArms() rebuilds every card with innerHTML. A language switch calls
+ * it again, which would silently collapse whichever contract-details panel the
+ * reader had opened and drop keyboard focus to <body> -- so a reader who opened
+ * a panel, then switched language, would lose both their place and their focus
+ * ring. Open state and focus are captured before the rebuild and restored
+ * after it, keyed by ARM ID rather than position so the mapping survives a
+ * reorder or a scenario change. */
+function armPanelState(){
+  var open={}, focus=null;
+  var nodes=document.querySelectorAll('#arms details[data-arm]');
+  for(var i=0;i<nodes.length;i++){
+    var id=nodes[i].getAttribute('data-arm');
+    open[id]=nodes[i].open;
+    if(nodes[i].contains(document.activeElement)) focus=id;
+  }
+  return {open:open,focus:focus};
+}
+function restoreArmPanels(st){
+  if(!st) return;
+  var nodes=document.querySelectorAll('#arms details[data-arm]');
+  for(var i=0;i<nodes.length;i++){
+    var id=nodes[i].getAttribute('data-arm');
+    if(st.open[id]) nodes[i].open=true;
+    if(st.focus===id){
+      var sm=nodes[i].querySelector('summary');
+      if(sm&&sm.focus) sm.focus();
+    }
+  }
+}
 function renderArms(arms){
+  var panels=armPanelState();
   el("arms").innerHTML=arms.map(function(a){
     var p=a.palette;
     // `a.kind` is the API's enum value; only its badge label is localised.
@@ -690,14 +727,14 @@ function renderArms(arms){
                             :t('lab.arm.kind.fixed',"Fixed payment");
     return '<article class="arm '+p+'">'+
       '<span class="tag '+p+'">'+esc(badge)+'</span>'+
-      '<h3>'+esc(a.name)+'</h3>'+
+      '<h3>'+esc(apiText(a,'name'))+'</h3>'+
       '<dl style="margin:8px 0 0">'+
         kv(t('lab.arm.capFactor',"Cap factor"),
            a.cap_factor==null?t('lab.value.none',"none"):"×"+num(a.cap_factor,4))+
         kvMoney(t('lab.arm.advance',"Advance"), a.principal)+
-        kvMoney(a.repayment_target.label, a.repayment_target.amount)+
-        kv(a.apr_label, apr(a))+
-        kv(a.duration_label, dur(a))+
+        kvMoney(apiText(a.repayment_target,'label'), a.repayment_target.amount)+
+        kv(apiText(a,'apr_label'), apr(a))+
+        kv(apiText(a,'duration_label'), dur(a))+
         // A-9 / D-050: the two denominators are different quantities, so both
         // are shown whenever either is partial. Showing the completion share
         // only when recovery is incomplete hid it at exactly 0% completion.
@@ -715,20 +752,22 @@ function renderArms(arms){
         ? '<p class="small" style="margin:6px 0 0" data-i18n="lab.arm.windowRateNote">'+
           esc(t('lab.arm.windowRateNote',
                 "Observed-window rate — read it beside the completion share above."))+'</p>' : '')+
-      '<details><summary data-i18n="lab.arm.whatIsThis">'+
-      esc(t('lab.arm.whatIsThis',"What this contract is"))+'</summary><p>'+esc(a.note)+'</p>'+
-      '<p><b>'+esc(a.repayment_target.label)+':</b> '+esc(a.repayment_target.basis)+'</p>'+
+      '<details data-arm="'+esc(a.id)+'"><summary data-i18n="lab.arm.whatIsThis">'+
+      esc(t('lab.arm.whatIsThis',"What this contract is"))+'</summary><p>'+esc(apiText(a,'note'))+'</p>'+
+      '<p><b>'+esc(apiText(a.repayment_target,'label'))+':</b> '+esc(apiText(a.repayment_target,'basis'))+'</p>'+
       // Both bases are rendered. The page previously showed duration_basis
       // only, so the APR's denominator and its observed-window caveat never
       // reached the reader at all -- the exact explanation A-9 exists to give.
       (a.censored ? '<p><b data-i18n="lab.arm.durationBasisLabel">'+
         esc(t('lab.arm.durationBasisLabel',"How the duration mean is computed:"))+
-        '</b> '+esc(a.duration_basis)+'</p>' : '')+
+        '</b> '+esc(apiText(a,'duration_basis'))+'</p>' : '')+
       '<p><b data-i18n="lab.arm.aprBasisLabel">'+
       esc(t('lab.arm.aprBasisLabel',"How the rate is computed:"))+
-      '</b> '+esc(a.apr_basis)+'</p>'+
+      '</b> '+esc(apiText(a,'apr_basis'))+'</p>'+
       '</details></article>';
   }).join("");
+
+  restoreArmPanels(panels);
 
   /* F1: these rows are rebuilt wholesale, so the USD pass must run again
    * over the new nodes. render() reads data-vnd, never the text. */
@@ -736,6 +775,38 @@ function renderArms(arms){
 }
 // Labels this page owns arrive here already translated; API-supplied labels
 // (repayment target, rate, duration) are passed through as they arrive.
+/* F7: prefer the catalogue entry the API names, fall back to its English.
+ * Numbers arrive as parameters, never baked into a translated string, so a
+ * localized sentence cannot drift from the artifact it describes. A missing or
+ * empty catalogue entry falls back to English rather than rendering blank. */
+function apiText(obj, field){
+  if(!obj) return '';
+  var key = obj[field + '_key'];
+  if(key && window.RBF_I18N){
+    var params = {}, raw = obj[field + '_params'] || {}, pk = obj[field + '_param_keys'] || {};
+    for(var a in raw) params[a] = raw[a];
+    for(var b in pk){ var tb = window.RBF_I18N.t(pk[b]); if(tb) params[b] = tb; }
+    var out = window.RBF_I18N.t(key, params);
+    if(out) return out;
+  }
+  return obj[field] == null ? '' : obj[field];
+}
+/* A composed finding arrives as ordered sentences, each separately
+ * translatable, because a denominator or selection caveat mistranslated
+ * inside a larger block would assert something the artifact does not say. */
+function apiProse(obj, field){
+  var parts = obj && obj[field + '_parts'];
+  if(parts && parts.length && window.RBF_I18N){
+    var rendered = parts.map(function(part){
+      var params = {}, raw = part.params || {}, pk = part.param_keys || {};
+      for(var a in raw) params[a] = raw[a];
+      for(var b in pk){ var tb = window.RBF_I18N.t(pk[b]); if(tb) params[b] = tb; }
+      return window.RBF_I18N.t(part.key, params);
+    }).filter(Boolean);
+    if(rendered.length === parts.length) return rendered.join(' ');
+  }
+  return apiText(obj, field);
+}
 function kv(k,v){return '<div class="kv"><dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd></div>';}
 /* F1: money rows carry their authoritative integer VND. lab.py's _fmt_money
  * already returns {vnd, display}, so the number is bound directly and the
@@ -747,12 +818,12 @@ function kvMoney(k,m){
 
 function renderLegend(arms){
   el("legend").innerHTML=arms.map(function(a){
-    return '<span><i class="sw" style="background:'+armColor(a)+'"></i>'+esc(a.name)+'</span>';
+    return '<span><i class="sw" style="background:'+armColor(a)+'"></i>'+esc(apiText(a,'name'))+'</span>';
   }).join("");
 }
 
 /* ── charts ─────────────────────────────────────────────────── */
-function armShort(a){ return a.chart_label; }
+function armShort(a){ return apiText(a,'chart_label'); }
 
 /* Label widths are MEASURED, not assumed. A fixed 206px gutter silently clipped
    the longer revenue-based labels — they ran to roughly 244px, and the overflow
@@ -794,7 +865,7 @@ function groupedBars(svgId, arms, series, fmt, maxOverride){
   series.forEach(function(s,si){
     if(si)y+=gap;
     body+='<text x="0" y="'+y+'" font-size="13" font-weight="700" fill="#3A3A34" '+
-          'font-family="Archivo,sans-serif">'+esc(s.label)+'</text>';
+          'font-family="Archivo,sans-serif">'+esc(apiText(s,'label'))+'</text>';
     y+=narrow?9:12;
     arms.forEach(function(a){
       var v=s.value(a), w=(v==null?0:Math.max(0,Math.min(1,v/max)))*track, col=armColor(a);
@@ -880,7 +951,7 @@ function renderDuration(arms){
     var durCell = esc(dur(a)) + (a.censored
       ? '<br><span class="qual" data-i18n="lab.dur.qual.completedOnly">'+
         esc(t('lab.dur.qual.completedOnly',"completed paths only"))+'</span>' : '');
-    return '<tr><th scope="row">'+esc(a.name)+'</th>'+
+    return '<tr><th scope="row">'+esc(apiText(a,'name'))+'</th>'+
       tdRaw(durCell)+td(a.duration_sd==null?"—":"±"+num(a.duration_sd,2))+
       td(a.incomplete_recovery_rate>0?pct(a.completed_share,1):"100.0%")+
       td(a.repayment_target.amount.display)+
@@ -920,7 +991,7 @@ function renderUnderreporting(u){
   STATE.under=u;                       // kept so a language switch can re-render
   if(!u){el("s-under").hidden=true;return;}
   el("s-under").hidden=false;
-  el("under-why").textContent=u.why_not_a_scenario;
+  el("under-why").textContent=apiText(u,'why_not_a_scenario');
   el("under-table").innerHTML='<table class="data" style="min-width:560px">'+
     '<thead><tr><th data-i18n="lab.under.col.observed">'+
     esc(t('lab.under.col.observed',"Revenue the provider observes"))+'</th>'+
@@ -937,7 +1008,7 @@ function renderUnderreporting(u){
   el("under-finding").innerHTML=(u.findings||[]).map(function(f){
     return '<article class="finding" style="margin-top:12px">'+
       '<span class="cls cls-'+esc(f.classification)+'">'+
-      esc(clsLabel(f.classification))+'</span><p>'+esc(f.text)+'</p>'+
+      esc(clsLabel(f.classification))+'</span><p>'+esc(apiProse(f,'text'))+'</p>'+
       '<p class="src">'+esc(t('lab.find.sourcePrefix',"source: "))+esc(f.source)+'</p></article>';
   }).join("");
 }
@@ -946,34 +1017,37 @@ function renderUnderreporting(u){
 function renderFindings(list){
   el("findings").innerHTML=list.map(function(f){
     return '<article class="finding"><span class="cls cls-'+esc(f.classification)+'">'+
-      esc(clsLabel(f.classification))+'</span><p>'+esc(f.text)+'</p>'+
+      esc(clsLabel(f.classification))+'</span><p>'+esc(apiProse(f,'text'))+'</p>'+
       '<p class="src">'+esc(t('lab.find.sourcePrefix',"source: "))+esc(f.source)+'</p></article>';
   }).join("");
 }
 /* Each caveat is this page's lead-in sentence followed by the API's own caveat
    text. Only the lead-in is translated here; the API prose is passed through. */
 function renderDefs(d){
-  el("def-burden").textContent=d.burden.definition+" "+d.burden.why;
+  el("def-burden").textContent=apiText(d.burden,'definition')+" "+apiText(d.burden,'why');
   el("burden-caveat").innerHTML=
-    t('lab.burden.caveatLead',"<strong>Read this with the chart.</strong>")+" "+esc(d.burden.caveat);
-  el("def-hpb").textContent=d.high_burden_months.definition+" "+d.high_burden_months.why;
+    t('lab.burden.caveatLead',"<strong>Read this with the chart.</strong>")+" "+esc(apiText(d.burden,'caveat'));
+  el("def-hpb").textContent=apiText(d.high_burden_months,'definition')+" "+apiText(d.high_burden_months,'why');
   el("hpb-caveat").innerHTML=
     t('lab.hpb.caveatLead',"<strong>Thresholds are illustrative.</strong>")+" "+
-    esc(d.high_burden_months.caveat);
-  el("def-recovery").textContent=d.recovery_ratio.definition+" "+d.recovery_ratio.why;
+    esc(apiText(d.high_burden_months,'caveat'));
+  el("def-recovery").textContent=apiText(d.recovery_ratio,'definition')+" "+apiText(d.recovery_ratio,'why');
   el("rec-caveat").innerHTML=
     t('lab.recovery.caveatLead',"<strong>Denominators differ by contract.</strong>")+" "+
-    esc(d.recovery_ratio.caveat);
-  el("def-dur").textContent=d.duration_months_mean.definition+" "+
-    d.duration_months_mean.why+" "+d.incomplete_recovery_rate.caveat;
+    esc(apiText(d.recovery_ratio,'caveat'));
+  el("def-dur").textContent=apiText(d.duration_months_mean,'definition')+" "+
+    apiText(d.duration_months_mean,'why')+" "+apiText(d.incomplete_recovery_rate,'caveat');
 }
 function renderPanels(d){
-  el("assumptions").innerHTML=d.assumptions.map(function(a){return '<li>'+esc(a)+'</li>';}).join("");
-  el("caveats").innerHTML=d.caveats.map(function(c){return '<li>'+esc(c.text)+'</li>';}).join("");
+  /* The assumptions arrive twice: as plain strings for any existing reader and
+     as a keyed list. The keyed list is preferred; the strings are the fallback. */
+  var asmp=d.assumptions_keyed||d.assumptions.map(function(a){return {text:a};});
+  el("assumptions").innerHTML=asmp.map(function(a){return '<li>'+esc(apiText(a,'text'))+'</li>';}).join("");
+  el("caveats").innerHTML=d.caveats.map(function(c){return '<li>'+esc(apiText(c,'text'))+'</li>';}).join("");
 }
 function renderSummary(s,label){
   if(!s||!s.sentence){el("summary-text").textContent="";return;}
-  el("summary-text").innerHTML='<b>'+esc(label)+'.</b> '+esc(s.sentence);
+  el("summary-text").innerHTML='<b>'+esc(apiText(s,"scenario_label")||label)+'.</b> '+esc(apiText(s,"sentence"));
 }
 
 /* ── orchestration ──────────────────────────────────────────── */
@@ -1003,7 +1077,7 @@ async function select(key){
     if(token !== REQ) return false;           // superseded — touch nothing
     STATE.scenario = key; STATE.data = d;
     markSelected(key);                        // the pill moves WITH the data
-    el("scn-desc").textContent = d.scenario.description;
+    el("scn-desc").textContent = apiText(d.scenario,"description");
     renderSummary(d.summary, d.scenario.label);
     renderArms(d.arms); renderLegend(d.arms);
     renderDuration(d.arms); renderDefs(d.metric_definitions);

@@ -1703,6 +1703,17 @@ function repaintDynamicCopy(){
     if(heroFootKey) setI18nText('hero-foot', heroFootKey);
   }
   if(resultLastData){ try { renderResult(resultLastData); } catch(_) { /* leave the result as rendered */ } }
+  /* F7: the dashboard builds its own copy at render time -- chart legends,
+     verdict badges, the traffic line, the empty-table message -- none of which
+     carry a data-i18n attribute, so the runtime's attribute pass cannot reach
+     them. Without this they stay in the language that was active when the
+     dashboard last loaded. `stats` is null until the first load, so the
+     repaint is skipped entirely before then rather than throwing. */
+  if(stats){
+    try { renderStats(); renderCounts(); renderCharts(); renderTable(); }
+    catch(_) { /* leave the dashboard as rendered */ }
+  }
+  if(window.RBF_FX) window.RBF_FX.render();
 }
 window.addEventListener('rbf:languagechange', repaintDynamicCopy);
 document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeMenu(); });
