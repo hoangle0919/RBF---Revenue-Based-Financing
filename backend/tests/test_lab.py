@@ -922,10 +922,25 @@ def test_public_safe_is_a_whitelist_not_a_blacklist():
 # ── survivor presentation reaches the reader ───────────────────────────────
 
 def test_completion_share_is_a_visible_card_row():
+    """And an UNCONDITIONAL one.
+
+    The row used to be gated on `completed_share < 1`, so at exactly 100% the
+    figure disappeared from the card -- while "how many paths complete within
+    24 months?" is one of the page's primary questions. The settlement cell
+    separately used to substitute a hard-coded full-recovery string when
+    incomplete recovery was zero, which made it the only research figure on the
+    page not formatted from the artifact. Both are pinned here.
+    """
     js = open(LAB_HTML, encoding="utf-8").read()
     assert "pct(a.completed_share,1)" in js
     assert_copy("lab.arm.pathsCompleting", "Paths completing within 24 months", js)
-    assert "a.incomplete_recovery_rate>0" in js
+    assert '"100.0%"' not in js, (
+        "completion must be formatted from completed_share, never a literal"
+    )
+    card = js.split("function renderArms(arms){", 1)[1].split("\n}\n", 1)[0]
+    assert "lab.arm.pathsCompleting" in card
+    gated = "a.completed_share<1\n          ? kv(t('lab.arm.pathsCompleting'"
+    assert gated not in js, "the completion row must not be gated on partial completion"
 
 
 def test_settlement_table_qualifies_the_duration_cell_per_row():

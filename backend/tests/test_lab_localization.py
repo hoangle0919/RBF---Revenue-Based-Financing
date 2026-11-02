@@ -258,3 +258,81 @@ def test_the_language_switch_repaints_the_dashboard_copy():
     for fn in ("renderStats()", "renderCounts()", "renderCharts()", "renderTable()"):
         assert fn in body, f"{fn} is not repainted on a language change"
     assert "if(stats)" in body, "the repaint must be skipped before the first load"
+
+
+# ── the compared pair, and the tie ─────────────────────────────────────────
+
+def test_the_headline_names_which_two_of_the_four_arms_it_compares():
+    """Four arms are on screen: two fixed, two revenue-based.
+
+    The headline used to say "the fixed arm" and "the revenue-based arm", which
+    identifies neither row. It compares FIX-A against RBF-ILL specifically.
+    """
+    for scenario in SCENARIOS:
+        body = client.get(f"/api/lab/comparison/{scenario}").json()
+        s = body.get("summary") or {}
+        if not s:
+            continue
+        assert s.get("compared_pair") == ["FIX-A", "RBF-ILL"], scenario
+        assert "FIX-A" in s["sentence"] and "RBF-ILL" in s["sentence"], scenario
+        assert "the fixed arm" not in s["sentence"], (
+            f"{scenario}: 'the fixed arm' does not identify one of two fixed arms")
+        pk = s.get("sentence_param_keys", {})
+        assert pk.get("fixedArm") == "labpage.armRef.FIX-A", scenario
+        assert pk.get("rbfArm") == "labpage.armRef.RBF-ILL", scenario
+        for lang, cat in (("en", EN), ("vi", VI)):
+            for key in ("labpage.armRef.FIX-A", "labpage.armRef.RBF-ILL"):
+                assert cat.get(key, "").strip(), f"{lang} missing {key}"
+
+
+def test_the_headline_does_not_read_a_share_of_target_as_an_amount():
+    """Each arm's denominator is its OWN target, and the targets differ."""
+    for scenario in SCENARIOS:
+        s = client.get(f"/api/lab/comparison/{scenario}").json().get("summary") or {}
+        if not s:
+            continue
+        assert "its own repayment target" in s["sentence"] or \
+               "their own repayment target" in s["sentence"], scenario
+        assert "not a comparison of amounts recovered" in s["sentence"] or \
+               "equal shares are not equal amounts" in s["sentence"], scenario
+
+
+def test_an_exact_tie_in_month_12_recovery_is_reported_as_level_not_as_more():
+    """A tie must not be reported as one arm having recovered more.
+
+    No registered scenario produces a tie today -- FIX-A sits at
+    0.923076923076923 in all thirteen while RBF-ILL ranges 0.443 to 1.0 -- so
+    the defect was latent. This drives the tie branch directly rather than
+    waiting for an artifact that happens to produce one.
+    """
+    from backend import lab as lab_mod
+
+    arms = lab_mod.comparison("stable")["arms"]
+    by = {a["id"]: a for a in arms}
+    fa, ill = dict(by["FIX-A"]), dict(by["RBF-ILL"])
+    tied = dict(fa["recovery_ratio"])
+    fa["recovery_ratio"] = tied
+    ill["recovery_ratio"] = dict(tied)          # exact equality at every month
+
+    out = lab_mod._summary("stable", [fa, ill])
+    assert out["sentence_key"] == "labpage.summary.sentenceLevel"
+    assert out["sentence_param_keys"]["faster"] == "labpage.armRef.both"
+    assert "the same share" in out["sentence"]
+    assert "has recovered a larger share" not in out["sentence"]
+    for lang, cat in (("en", EN), ("vi", VI)):
+        assert cat.get("labpage.summary.sentenceLevel", "").strip(), f"{lang} missing"
+        assert cat.get("labpage.armRef.both", "").strip(), f"{lang} missing"
+
+
+def test_the_recovery_finding_handles_a_tie_too():
+    """The same `>=` lived in the findings, where it read 'ahead of'."""
+    for lang, cat in (("en", EN), ("vi", VI)):
+        for key in ("labpage.finding.direction.ahead",
+                    "labpage.finding.direction.behind",
+                    "labpage.finding.direction.level"):
+            assert cat.get(key, "").strip(), f"{lang} missing {key}"
+    src = (ROOT / "backend" / "lab.py").read_text(encoding="utf-8")
+    assert 'direction, direction_key = "level with"' in src
+    assert 'direction = "ahead of" if f12 >= r12 else "behind"' not in src, (
+        ">= reports a tie as 'ahead of'"
+    )

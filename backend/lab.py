@@ -192,6 +192,13 @@ ARMS = [
              "revenue-based repayment."},
 ]
 
+# Short reader-facing references used inside composed sentences. FIX-A and
+# RBF-ILL are internal identifiers; a sentence that compares two of four arms
+# has to name which two in words a first-time reader can follow, with the id
+# kept as a secondary reference.
+FIX_A_REF = "the cost-matched fixed payment (FIX-A)"
+RBF_ILL_REF = "the illustrative revenue-based contract (RBF-ILL)"
+
 _CACHE: Dict[str, dict] = {}
 
 
@@ -987,9 +994,26 @@ def _summary(scenario: str, arms: List[dict]) -> dict:
     fa, ill = by.get("FIX-A"), by.get("RBF-ILL")
     if not (fa and ill):
         return {}
-    faster = "the fixed arm" if fa["recovery_ratio"].get("12", 0) >= ill["recovery_ratio"].get("12", 0) \
-        else "the revenue-based arm"
-    _ = None
+    # NAME THE PAIR. This headline compares exactly two of the four arms --
+    # FIX-A against RBF-ILL -- and there are two fixed arms and two
+    # revenue-based arms on screen, so "the fixed arm" does not identify a row.
+    #
+    # And handle EQUALITY. `>=` used to select FIX-A at an exact tie and then
+    # assert it had recovered more, which is false. No currently registered
+    # scenario produces a tie (FIX-A sits at 0.923076923076923 in all thirteen
+    # while RBF-ILL ranges 0.443 to 1.0), so this was latent rather than live;
+    # it is fixed here rather than left for an artifact that produces one.
+    f12 = fa["recovery_ratio"].get("12", 0)
+    r12 = ill["recovery_ratio"].get("12", 0)
+    if f12 == r12:
+        faster, faster_key = "both contracts", "labpage.armRef.both"
+        sentence_key = "labpage.summary.sentenceLevel"
+    elif f12 > r12:
+        faster, faster_key = FIX_A_REF, "labpage.armRef.FIX-A"
+        sentence_key = "labpage.summary.sentence"
+    else:
+        faster, faster_key = RBF_ILL_REF, "labpage.armRef.RBF-ILL"
+        sentence_key = "labpage.summary.sentence"
     return {
         "scenario_label": SCENARIOS[scenario]["label"],
         "scenario_label_key": f"labpage.scenario.{scenario}.label",
@@ -999,14 +1023,23 @@ def _summary(scenario: str, arms: List[dict]) -> dict:
         "recovery12_rbf": ill["recovery_ratio"].get("12"),
         "incomplete_rbf": ill["incomplete_recovery_rate"],
         "faster_by_month_12": faster,
-        "sentence": (f"In this scenario, peak payment burden reaches "
-                     f"{fa['burden']['max']:.1%} under the fixed arm against "
-                     f"{ill['burden']['max']:.1%} under the revenue-based arm, "
-                     f"and {faster} has recovered more by month 12."),
-        "sentence_key": "labpage.summary.sentence",
+        "compared_pair": ["FIX-A", "RBF-ILL"],
+        "sentence": (
+            f"Comparing {FIX_A_REF} with {RBF_ILL_REF}: peak payment burden "
+            f"reaches {fa['burden']['max']:.1%} against "
+            f"{ill['burden']['max']:.1%}, and by month 12 "
+            + ("both have recovered the same share of their own repayment "
+               "target." if f12 == r12 else
+               f"{faster} has recovered a larger share of its own repayment "
+               "target.")
+            + " The two targets differ, so this is not a comparison of amounts "
+              "recovered."),
+        "sentence_key": sentence_key,
         "sentence_params": {"fixedPct": f"{fa['burden']['max']:.1%}",
-                            "rbfPct": f"{ill['burden']['max']:.1%}",
-                            "faster": faster},
+                            "rbfPct": f"{ill['burden']['max']:.1%}"},
+        "sentence_param_keys": {"fixedArm": "labpage.armRef.FIX-A",
+                                "rbfArm": "labpage.armRef.RBF-ILL",
+                                "faster": faster_key},
     }
 
 
@@ -1089,20 +1122,30 @@ def _findings(scenario: str, arms: List[dict]) -> List[dict]:
             "source": fa["source_artifact"]})
 
         f12, r12 = fa["recovery_ratio"].get("12", 0), ill["recovery_ratio"].get("12", 0)
-        direction = "ahead of" if f12 >= r12 else "behind"
-        direction_key = ("labpage.finding.direction.ahead" if f12 >= r12
-                         else "labpage.finding.direction.behind")
+        # Same equality correction as _summary: an exact tie is "level with",
+        # not "ahead of".
+        if f12 == r12:
+            direction, direction_key = "level with", "labpage.finding.direction.level"
+        elif f12 > r12:
+            direction, direction_key = "ahead of", "labpage.finding.direction.ahead"
+        else:
+            direction, direction_key = "behind", "labpage.finding.direction.behind"
         out.append({
             "classification": "simulation_result",
-            "text": (f"In the {label} scenario, provider recovery by month 12 is "
-                     f"{f12:.1%} for the fixed arm and {r12:.1%} for the "
-                     f"revenue-based arm — the fixed arm is {direction} the "
-                     f"revenue-based arm here. This ordering is a property of "
-                     f"this scenario and does not hold across all of them."),
+            "text": (f"In the {label} scenario, recovery by month 12 reaches "
+                     f"{f12:.1%} of its own target for {FIX_A_REF} and "
+                     f"{r12:.1%} of its own target for {RBF_ILL_REF} — so "
+                     f"{FIX_A_REF} is {direction} {RBF_ILL_REF} here as a share "
+                     f"of target. The two targets differ, so this is not a "
+                     f"comparison of amounts recovered. This ordering is a "
+                     f"property of this scenario and does not hold across all "
+                     f"of them."),
             "text_key": "labpage.finding.recovery12",
             "text_params": {"fixedPct": f"{f12:.1%}", "rbfPct": f"{r12:.1%}"},
             "text_param_keys": {"scenario": f"labpage.scenario.{scenario}.label",
-                                "direction": direction_key},
+                                "direction": direction_key,
+                                "fixedArm": "labpage.armRef.FIX-A",
+                                "rbfArm": "labpage.armRef.RBF-ILL"},
             "source": ill["source_artifact"]})
 
         if ill["incomplete_recovery_rate"] > 0:
