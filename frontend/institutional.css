@@ -29,7 +29,10 @@
 .menu-toggle{display:none;border:0;background:none;color:var(--navy);padding:12px 0}
 .site-menu{padding:12px 28px 24px;border-top:1px solid var(--line);background:var(--off-white)}
 .site-menu a{display:block;padding:13px 0;border-bottom:1px solid var(--line)}
-.intro{display:grid;grid-template-columns:1.1fr 1fr;gap:70px;padding-block:82px 84px;align-items:center}
+/* align-items:start, NOT center. Centring vertically centred the shorter
+   copy cell against the 638px-tall figure cell, which pushed the action row
+   to 715px of a 768px viewport -- measured, not estimated. */
+.intro{display:grid;grid-template-columns:1.1fr 1fr;gap:70px;padding-block:72px 84px;align-items:start}
 .eyeline{text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:600;line-height:1.6}
 .intro .eyeline{display:flex;align-items:center;gap:12px;margin-bottom:26px}
 .short-rule{width:26px;height:2px;background:#996d32}
@@ -257,4 +260,27 @@
   .prototype .lang-switch button{padding:4px 1px;white-space:nowrap}
   .prototype .lang-sep{display:none}
   .fx-switch{flex-wrap:wrap;row-gap:4px}
+}
+
+/* ── Hero entry block ───────────────────────────────────────────────────────
+   The primary path for a first-time reviewer: try the prototype, then read
+   either language edition of the paper. Built from the existing .action /
+   .underlink components and the existing tokens; no new theme. */
+.intro-entry{display:block;margin-top:30px}
+.intro-entry .action{min-height:44px;display:inline-flex;align-items:center}
+.intro-entry .entry-note{font-size:12px;color:var(--muted-ink);margin-top:10px!important;max-width:420px;line-height:1.6}
+.entry-papers{margin-top:18px;padding-top:16px;border-top:1px solid var(--line);max-width:460px}
+.entry-label{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-ink)}
+.entry-links{display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:9px}
+.entry-links a{font-size:15px;border-bottom:1px solid var(--navy);padding:9px 0;min-height:44px;display:inline-flex;align-items:center}
+.entry-links a:hover{border-bottom-color:var(--ochre)}
+.entry-papers .entry-note{margin-top:8px!important}
+.entry-primary{display:flex;align-items:center;flex-wrap:wrap;gap:14px 26px}
+.entry-primary>.underlink{display:inline-flex;align-items:center;min-height:44px}
+@media(max-width:540px){
+  .intro-entry{margin-top:24px}
+  .entry-primary{gap:10px 18px}
+  .intro-entry .action{width:100%;justify-content:center}
+  .entry-links{gap:4px 20px}
+  .entry-links a{font-size:14px}
 }

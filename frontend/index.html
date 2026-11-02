@@ -24,13 +24,13 @@
   <div class="site-width header-inner">
     <a class="wordmark" href="/" aria-label="RBF home" data-i18n-attr="aria-label:chrome.home"><span class="rbf-mark" aria-hidden="true">R</span><span>RBF</span></a>
     <nav class="desktop-nav" aria-label="Main navigation" data-i18n-attr="aria-label:chrome.nav.main">
-      <a href="#approach" data-i18n="chrome.nav.approach">Approach</a><a href="/lab" data-i18n="chrome.nav.lab">Simulation Lab</a><a href="#research" data-i18n="chrome.nav.research">Research</a>
+      <a href="/demo.html#prototype" data-i18n="chrome.nav.prototype">Interactive prototype</a><a href="#research" data-i18n="chrome.nav.papers">Papers</a><a href="/lab" data-i18n="chrome.nav.lab">Simulation Lab</a><a href="#approach" data-i18n="chrome.nav.approach">Approach</a>
     </nav>
     <div class="lang-switch" role="group" aria-label="Language" data-i18n-attr="aria-label:lang.label"><button type="button" data-lang-option="en" aria-pressed="true">English</button><span class="lang-sep" aria-hidden="true">/</span><button type="button" data-lang-option="vi" aria-pressed="false" lang="vi">Tiếng Việt</button></div><a class="header-contact" href="#contact"><span data-i18n="chrome.nav.contact">Discuss the research</span> <span aria-hidden="true">↗</span></a>
     <button id="menu-toggle" class="menu-toggle" aria-controls="site-menu" aria-expanded="false"><span data-i18n="chrome.menu">Menu</span> <span aria-hidden="true">+</span></button>
   </div>
   <nav id="site-menu" class="site-menu" aria-label="Mobile navigation" data-i18n-attr="aria-label:chrome.nav.mobile" hidden>
-    <a href="#approach" data-i18n="chrome.nav.approach">Approach</a><a href="/lab" data-i18n="chrome.nav.lab">Simulation Lab</a><a href="#research" data-i18n="chrome.nav.research">Research</a><a href="#contact" data-i18n="chrome.nav.contact">Discuss the research</a><a href="/demo.html" data-i18n="chrome.nav.prototype">Interactive prototype</a>
+    <a href="/demo.html#prototype" data-i18n="chrome.nav.prototype">Interactive prototype</a><a href="#research" data-i18n="chrome.nav.papers">Papers</a><a href="/lab" data-i18n="chrome.nav.lab">Simulation Lab</a><a href="#approach" data-i18n="chrome.nav.approach">Approach</a><a href="#contact" data-i18n="chrome.nav.contact">Discuss the research</a>
     <div class="lang-switch lang-switch-menu" role="group" aria-label="Language" data-i18n-attr="aria-label:lang.label"><button type="button" data-lang-option="en" aria-pressed="true">English</button><span class="lang-sep" aria-hidden="true">/</span><button type="button" data-lang-option="vi" aria-pressed="false" lang="vi">Tiếng Việt</button></div>
   </nav>
 </header>
@@ -41,8 +41,19 @@
       <p class="eyeline"><span class="short-rule" aria-hidden="true"></span><span data-i18n="hero.eyeline">Revenue-based financing</span></p>
       <h1 id="intro-title" data-i18n-html="hero.title">A clearer view<br>of the <em>contract.</em></h1>
       <p class="intro-lead" data-i18n-html="hero.lead">When revenue changes, the contract matters.<br class="desktop-break"> Understand the mechanics on both sides.</p>
-      <p class="intro-context" data-i18n="hero.context">RBF studies how financing structures behave under volatile sales, motivated by Vietnamese e-commerce. Research and software—not a credit recommendation.</p>
-      <div class="intro-actions"><a class="action action-dark" href="/lab"><span data-i18n="hero.cta.lab">Explore the Simulation Lab</span> <span aria-hidden="true">↗</span></a><a class="underlink" href="#research" data-i18n="hero.cta.research">Read the research</a></div>
+      <div class="intro-actions intro-entry">
+        <div class="entry-primary">
+          <a class="action action-dark" href="/demo.html#prototype"><span data-i18n="hero.cta.prototype">Try the prototype</span> <span aria-hidden="true">&rarr;</span></a>
+          <a class="underlink" href="/lab" data-i18n="hero.cta.lab">Explore the Simulation Lab</a>
+        </div>
+        <p class="entry-note" data-i18n="hero.cta.prototypeNote">Synthetic examples only. The demonstration score is unvalidated.</p>
+        <div class="entry-papers">
+          <span class="entry-label" data-i18n="hero.papers.label">Read the paper</span>
+          <span class="entry-links"><a href="https://github.com/hoangle0919/sellerflow/blob/main/research/publication/reader_editions/papers/Revenue_Contingent_Financing_Professional_Paper.pdf" data-i18n="research.paper.en">English paper</a><a lang="vi" href="https://github.com/hoangle0919/sellerflow/blob/main/research/publication/reader_editions/papers/Tai_Tro_Hoan_Tra_Theo_Doanh_Thu_Bai_Nghien_Cuu.pdf" data-i18n="research.paper.vi">B&agrave;i nghi&ecirc;n c&uacute;&#768;u ti&ecirc;&#769;ng Vi&ecirc;&#803;t</a></span>
+          <span class="entry-note" data-i18n="hero.papers.editions">Two language editions of one study.</span>
+        </div>
+      </div>
+      <p class="intro-context" data-i18n="hero.context">RBF studies how financing structures behave under volatile sales, motivated by Vietnamese e-commerce. Research and software&mdash;not a credit recommendation.</p>
     </div>
 
     <figure class="contract-figure" aria-labelledby="figure-title" aria-describedby="figure-caption">
