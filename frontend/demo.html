@@ -726,6 +726,13 @@ tr{cursor:pointer}tbody tr:hover td{background:var(--paper)}
             <button class="hero-full-link text-link" id="hero-full-link" onclick="heroViewFull()" disabled data-i18n="demo.hero.viewFull">View full example →</button>
           </div>
         </div>
+        <!-- R4.2: the workbench's amounts are USD-bound, so the dated source
+             and status note belongs HERE, beside them. It used to live only in
+             #page-result, so a visitor had to open the full example to learn
+             what the conversion was based on. The control and the note are a
+             pair; fx-display keeps every [data-fx-option] group in sync. -->
+        <div class="fx-switch" role="group" aria-label="Amount display" data-i18n-attr="aria-label:fx.display.label" style="margin-top:14px"><button type="button" data-fx-option="vnd" aria-pressed="false" data-i18n="fx.display.vnd">VND only</button><span class="lang-sep" aria-hidden="true">/</span><button type="button" data-fx-option="dual" aria-pressed="true" data-i18n="fx.display.dual">VND + ≈ USD</button></div>
+        <p class="fx-note" data-fx-note aria-live="polite" style="margin-top:6px"></p>
         <div class="proof-foot" id="hero-foot" aria-live="polite" data-i18n="demo.hero.loading">Loading the prototype response…</div>
         <button class="btn btn-ghost" id="hero-retry" onclick="heroRunPreview()" hidden data-i18n="demo.hero.retry">Retry preview</button>
       </div>
@@ -1051,9 +1058,24 @@ async function callAPI(endpoint, options = {}) {
  * than publishing a figure we cannot convert exactly. */
 function bindMoney(el, vnd) {
   if (!el) return;
+  /* null, undefined and '' all coerce to 0 through Number(), which used to
+     bind data-vnd="0" and paint "≈ 0.00 USD" beside the dash that fmtVND()
+     renders for exactly those values. Absence is not zero, so it is rejected
+     before the numeric check. */
+  if (vnd === null || vnd === undefined || vnd === '') { unbindMoney(el); return; }
   const n = Number(vnd);
   if (Number.isFinite(n) && Math.floor(n) === n && n >= 0) el.setAttribute('data-vnd', String(n));
-  else el.removeAttribute('data-vnd');
+  else unbindMoney(el);
+}
+/* Removing the TEXT is not enough. fx-display reads data-vnd, not the text, so
+   an element left bound keeps -- and on the next render() repaints -- a USD
+   amount beside a dash and a "no current result" message. Both the binding and
+   the sibling .fx-line have to go. */
+function unbindMoney(el) {
+  if (!el) return;
+  el.removeAttribute('data-vnd');
+  const sib = el.nextElementSibling;
+  if (sib && sib.classList && sib.classList.contains('fx-line')) sib.remove();
 }
 function setMoney(id, vnd) {
   const el = document.getElementById(id);
@@ -1648,7 +1670,11 @@ function clearHeroResult(messageKey){
   heroLastData=null; heroLastMs=null; heroPlaceholderKey=messageKey;
   document.getElementById('hd-box').className='decision-box';
   setI18nText('hd-word',messageKey);
-  ['hd-tier','hd-limit','hd-rate','hd-pd','hd-dur','hd-apr'].forEach(id=>document.getElementById(id).textContent='—');
+  ['hd-tier','hd-limit','hd-rate','hd-pd','hd-dur','hd-apr'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.textContent='—';
+    unbindMoney(el);      // the USD line must not outlive the figure it converts
+  });
   setI18nText('hd-pdline','demo.hero.d.noResult');
   document.getElementById('hero-chips').textContent='';
   document.getElementById('hero-reason').textContent='';
