@@ -196,6 +196,14 @@ ARMS = [
 # RBF-ILL are internal identifiers; a sentence that compares two of four arms
 # has to name which two in words a first-time reader can follow, with the id
 # kept as a secondary reference.
+def _target_vnd(arm: dict):
+    """The arm's repayment target in VND, or None if it has no structured one."""
+    t = arm.get("repayment_target")
+    if isinstance(t, dict) and isinstance(t.get("amount"), dict):
+        return t["amount"].get("vnd")
+    return None
+
+
 FIX_A_REF = "the cost-matched fixed payment (FIX-A)"
 RBF_ILL_REF = "the illustrative revenue-based contract (RBF-ILL)"
 
@@ -285,34 +293,61 @@ def _grid_pricing() -> dict:
 NUMERICAL_ROOT_F = "1.09462066267694"
 
 
-def _grid_pricing_sentence() -> str:
-    """The pricing statement, built from the artifact.
+def _grid_pricing_parts() -> dict:
+    """The pricing statement as a TRANSLATABLE key plus artifact-sourced params.
 
     Says three things, in order: what the registered value **is** (nearest point
     on a 0.0005-step grid), what its residual **means** (grid resolution), and
     what the residual does **not** mean (that no `f` attains the target).
+
+    It used to return finished English prose, which was then inserted into a
+    Vietnamese sentence as a `{grid}` parameter -- so a Vietnamese reader got a
+    Vietnamese wrapper around a whole English paragraph. The residual-English
+    scanner could not see it, because it skips any text node that contains a
+    Vietnamese diacritic and the surrounding wrapper supplied one. The prose is
+    now a catalogue entry in both languages and only the FIGURES travel as
+    parameters, so they still come from the artifact at request time.
     """
     p = _grid_pricing()
     a, t, r = p["achieved_apr"], p["benchmark_apr"], p["residual_pp"]
     if a is None or t is None:
-        return ("The cost-matched cap factor is the nearest point found on the "
-                "registered search grid, not a solved root; the pricing artifact "
-                "needed to quote the residual is not loaded.")
+        return {
+            "key": "labpage.grid.unavailable",
+            "params": {},
+            "text": ("The cost-matched cap factor is the nearest point found on "
+                     "the registered search grid, not a solved root; the pricing "
+                     "artifact needed to quote the residual is not loaded."),
+        }
     if p["exact_match"]:
-        return (f"The cost-matched cap factor is the nearest point found on the "
-                f"registered 0.0005-step search grid. On this sweep that point "
-                f"lands on the benchmark's {t:.6%} to displayed precision.")
-    return (
-        f"The cost-matched cap factor is the NEAREST POINT FOUND ON THE "
-        f"REGISTERED 0.0005-step search grid: it prices at {a:.6%} against the "
-        f"amortizing loan's {t:.6%}, a residual of about {r:.5f} percentage "
-        f"points. That residual is a GRID-RESOLUTION result — it reflects how "
-        f"finely the search was stepped, not a limit on what is attainable. "
-        f"Within an interval where the paying-month count stays fixed, the "
-        f"clipped final payment changes continuously with the cap factor, so "
-        f"the effective APR does too; a numerical root exists on the reference "
-        f"path at approximately f = {NUMERICAL_ROOT_F}. Changes in the "
-        f"paying-month count create kinks in that relationship, not gaps.")
+        return {
+            "key": "labpage.grid.exact",
+            "params": {"benchmark": f"{t:.6%}"},
+            "text": (f"The cost-matched cap factor is the nearest point found on "
+                     f"the registered 0.0005-step search grid. On this sweep that "
+                     f"point lands on the benchmark's {t:.6%} to displayed "
+                     f"precision."),
+        }
+    return {
+        "key": "labpage.grid.residual",
+        "params": {"achieved": f"{a:.6%}", "benchmark": f"{t:.6%}",
+                   "residual": f"{r:.5f}", "rootF": f"{NUMERICAL_ROOT_F}"},
+        "text": (
+            f"The cost-matched cap factor is the NEAREST POINT FOUND ON THE "
+            f"REGISTERED 0.0005-step search grid: it prices at {a:.6%} against the "
+            f"amortizing loan's {t:.6%}, a residual of about {r:.5f} percentage "
+            f"points. That residual is a GRID-RESOLUTION result — it reflects how "
+            f"finely the search was stepped, not a limit on what is attainable. "
+            f"Within an interval where the paying-month count stays fixed, the "
+            f"clipped final payment changes continuously with the cap factor, so "
+            f"the effective APR does too; a numerical root exists on the reference "
+            f"path at approximately f = {NUMERICAL_ROOT_F}. Changes in the "
+            f"paying-month count create kinks in that relationship, not gaps."),
+    }
+
+
+def _grid_pricing_sentence() -> str:
+    """The English rendering, for the fields that still carry plain prose."""
+    return _grid_pricing_parts()["text"]
 
 
 def _resolve(track: str, scenario: str):
@@ -624,7 +659,10 @@ def _arm_block(spec: dict, scenario: str) -> Optional[dict]:
     # the registered artifact at request time. It travels as a parameter so the
     # translated note cannot outlive the sweep it describes.
     if aid == "RBF-EQ":
-        block["note_params"] = {"grid": _grid_pricing_sentence()}
+        _g = _grid_pricing_parts()
+        # The grid sentence is itself translated; only its figures are params.
+        block["note_params"] = dict(_g["params"])
+        block["note_param_keys"] = {"grid": _g["key"]}
     _k(block, "cap_basis", f"labpage.arm.{aid}.capBasis")
     _k(block, "apr_label", "labpage.arm.aprLabel")
     _k(block, "duration_label", "labpage.arm.durationLabel")
@@ -972,17 +1010,19 @@ def caveats() -> List[dict]:
     at request time rather than baked into the constant, so the caveat cannot
     outlive the sweep it is describing.
     """
-    grid = _grid_pricing_sentence()
+    g = _grid_pricing_parts()
     out = []
     for i, c in enumerate(CAVEATS):
-        item = {**c, "text": c["text"].replace("{grid}", grid)}
+        item = {**c, "text": c["text"].replace("{grid}", g["text"])}
         # Position is the only stable handle these constants carry, so the key
-        # is index-based and a test pins the count. The grid sentence is a
-        # parameter, not part of the translated string: it is read from the
-        # registered artifact at request time and must not be frozen.
+        # is index-based and a test pins the count. The grid sentence travels
+        # as a translation KEY plus artifact-sourced figures -- not as finished
+        # English prose, which is how an English paragraph used to end up
+        # inside a Vietnamese caveat.
         item["text_key"] = f"labpage.caveat.{i}"
         if "{grid}" in c["text"]:
-            item["text_params"] = {"grid": grid}
+            item["text_params"] = dict(g["params"])
+            item["text_param_keys"] = {"grid": g["key"]}
         out.append(item)
     return out
 
@@ -1005,15 +1045,46 @@ def _summary(scenario: str, arms: List[dict]) -> dict:
     # it is fixed here rather than left for an artifact that produces one.
     f12 = fa["recovery_ratio"].get("12", 0)
     r12 = ill["recovery_ratio"].get("12", 0)
+
+    # WHETHER THE TARGETS DIFFER IS READ FROM THE TARGETS, not assumed. This
+    # pair happens to share a target -- both are the 1.20 cap on the same
+    # advance, so both are 222,000,000 VND in every registered scenario -- and
+    # for an equal target a larger share IS a larger amount. Saying otherwise
+    # was wrong. The branch is derived so it stays right if a future artifact
+    # prices them apart.
+    fa_target = _target_vnd(fa)
+    ill_target = _target_vnd(ill)
+    same_target = (fa_target is not None and fa_target == ill_target)
+
     if f12 == r12:
         faster, faster_key = "both contracts", "labpage.armRef.both"
-        sentence_key = "labpage.summary.sentenceLevel"
+        sentence_key = ("labpage.summary.sentenceLevelSameTarget" if same_target
+                        else "labpage.summary.sentenceLevel")
     elif f12 > r12:
         faster, faster_key = FIX_A_REF, "labpage.armRef.FIX-A"
-        sentence_key = "labpage.summary.sentence"
+        sentence_key = ("labpage.summary.sentenceSameTarget" if same_target
+                        else "labpage.summary.sentence")
     else:
         faster, faster_key = RBF_ILL_REF, "labpage.armRef.RBF-ILL"
-        sentence_key = "labpage.summary.sentence"
+        sentence_key = ("labpage.summary.sentenceSameTarget" if same_target
+                        else "labpage.summary.sentence")
+
+    # The English built here is the fallback a reader sees when no catalogue
+    # entry resolves, so it must say exactly what the catalogue entry for the
+    # same branch says -- including in the tie case, where "the same share is
+    # the same amount" is the precise statement and "compare like for like"
+    # is not.
+    tied = (f12 == r12)
+    target_display = fa["repayment_target"]["amount"]["display"]
+    if same_target and tied:
+        target_clause = f" Both target {target_display}, so the same share is the same amount."
+    elif same_target:
+        target_clause = f" Both target {target_display}, so the two percentages compare like for like."
+    elif tied:
+        target_clause = " The two targets differ, so the same share is not the same amount."
+    else:
+        target_clause = (" The two targets differ, so this is not a comparison "
+                         "of amounts recovered.")
     return {
         "scenario_label": SCENARIOS[scenario]["label"],
         "scenario_label_key": f"labpage.scenario.{scenario}.label",
@@ -1024,19 +1095,20 @@ def _summary(scenario: str, arms: List[dict]) -> dict:
         "incomplete_rbf": ill["incomplete_recovery_rate"],
         "faster_by_month_12": faster,
         "compared_pair": ["FIX-A", "RBF-ILL"],
+        "same_target": same_target,
         "sentence": (
             f"Comparing {FIX_A_REF} with {RBF_ILL_REF}: peak payment burden "
             f"reaches {fa['burden']['max']:.1%} against "
             f"{ill['burden']['max']:.1%}, and by month 12 "
-            + ("both have recovered the same share of their own repayment "
-               "target." if f12 == r12 else
-               f"{faster} has recovered a larger share of its own repayment "
+            + ("both have recovered the same share of their repayment "
+               "target." if tied else
+               f"{faster} has recovered a larger share of its repayment "
                "target.")
-            + " The two targets differ, so this is not a comparison of amounts "
-              "recovered."),
+            + target_clause),
         "sentence_key": sentence_key,
         "sentence_params": {"fixedPct": f"{fa['burden']['max']:.1%}",
-                            "rbfPct": f"{ill['burden']['max']:.1%}"},
+                            "rbfPct": f"{ill['burden']['max']:.1%}",
+                            "target": fa["repayment_target"]["amount"]["display"]},
         "sentence_param_keys": {"fixedArm": "labpage.armRef.FIX-A",
                                 "rbfArm": "labpage.armRef.RBF-ILL",
                                 "faster": faster_key},
@@ -1132,16 +1204,26 @@ def _findings(scenario: str, arms: List[dict]) -> List[dict]:
             direction, direction_key = "behind", "labpage.finding.direction.behind"
         out.append({
             "classification": "simulation_result",
+            # Same correction as the headline: read whether the targets match
+            # rather than asserting that they differ.
             "text": (f"In the {label} scenario, recovery by month 12 reaches "
-                     f"{f12:.1%} of its own target for {FIX_A_REF} and "
-                     f"{r12:.1%} of its own target for {RBF_ILL_REF} — so "
-                     f"{FIX_A_REF} is {direction} {RBF_ILL_REF} here as a share "
-                     f"of target. The two targets differ, so this is not a "
-                     f"comparison of amounts recovered. This ordering is a "
-                     f"property of this scenario and does not hold across all "
-                     f"of them."),
-            "text_key": "labpage.finding.recovery12",
-            "text_params": {"fixedPct": f"{f12:.1%}", "rbfPct": f"{r12:.1%}"},
+                     f"{f12:.1%} of target for {FIX_A_REF} and "
+                     f"{r12:.1%} of target for {RBF_ILL_REF} — so "
+                     f"{FIX_A_REF} is {direction} {RBF_ILL_REF} here. "
+                     + (f"Both target {fa['repayment_target']['amount']['display']}, "
+                        f"so these percentages compare like for like."
+                        if _target_vnd(fa) is not None
+                        and _target_vnd(fa) == _target_vnd(ill)
+                        else "The two targets differ, so this is not a "
+                             "comparison of amounts recovered.")
+                     + f" This ordering is a property of this scenario and does "
+                       f"not hold across all of them."),
+            "text_key": ("labpage.finding.recovery12SameTarget"
+                         if _target_vnd(fa) is not None
+                         and _target_vnd(fa) == _target_vnd(ill)
+                         else "labpage.finding.recovery12"),
+            "text_params": {"fixedPct": f"{f12:.1%}", "rbfPct": f"{r12:.1%}",
+                            "target": fa["repayment_target"]["amount"]["display"]},
             "text_param_keys": {"scenario": f"labpage.scenario.{scenario}.label",
                                 "direction": direction_key,
                                 "fixedArm": "labpage.armRef.FIX-A",

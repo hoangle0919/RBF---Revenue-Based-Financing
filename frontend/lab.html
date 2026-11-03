@@ -94,6 +94,38 @@ section{margin-bottom:26px;scroll-margin-top:96px;}
 .about-study{margin-top:16px}
 .about-study>summary h3{margin:0!important;display:inline;font-size:.95rem}
 .lab-opener{margin:10px 0 0;font-size:1rem;line-height:1.6;max-width:62ch;color:var(--ink)}
+/* R1: the guided table carried table.data's min-width:760px into a 313px
+   phone viewport, so overflow-x:auto hid the actual answers behind a sideways
+   scroll -- a page-width overflow check passes while the core task fails.
+   Below 620px each contract becomes a labelled card instead. The label text
+   is written to data-label by renderGuided(), because the column count differs
+   per question and a fixed --l2..--l7 scheme cannot cover that. */
+#guided-table{container-type:inline-size;}
+@container (width < 620px){
+  #guided-table table,#guided-table thead,#guided-table tbody,
+  #guided-table tr,#guided-table th,#guided-table td{display:block;}
+  /* display:block alone does not relax min-width, and that min-width is what
+     keeps the horizontal scrollbar alive. */
+  #guided-table table.guided{min-width:0;width:100%;}
+  #guided-table thead{display:none;}
+  #guided-table tr{border:1px solid var(--line);border-radius:4px;
+    padding:10px 12px 6px;margin:0 0 10px;}
+  #guided-table tbody th{text-align:left;font-weight:600;padding:0 0 8px;
+    border-bottom:1px solid var(--line);}
+  #guided-table td{text-align:left;padding:8px 0;display:block;
+    border-bottom:1px solid var(--line);}
+  #guided-table tr td:last-child{border-bottom:none;}
+  /* Label ABOVE the value, both as blocks. A single flex line put the label
+     and the value side by side, which worked for "Mean burden" and pushed the
+     value 76px outside the card for "Mean path-level 90th percentile" -- the
+     longer, accurate label. Stacking cannot overflow at any label length.
+     The slash form asks for the label to be announced without the trailing
+     colon; how a given screen reader actually announces it is NOT established
+     by this CSS. */
+  #guided-table td::before{content:attr(data-label) / attr(data-label);
+    display:block;font-weight:400;color:var(--muted);font-size:.8rem;
+    line-height:1.4;margin-bottom:2px;}
+}
 /* Optional detail panels. The guided card answers the three primary questions;
    these hold the full chart, the per-arm detail and the measurement notes. */
 .panel>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;min-height:44px}
@@ -877,7 +909,13 @@ function apiText(obj, field){
   if(key && window.RBF_I18N){
     var params = {}, raw = obj[field + '_params'] || {}, pk = obj[field + '_param_keys'] || {};
     for(var a in raw) params[a] = raw[a];
-    for(var b in pk){ var tb = window.RBF_I18N.t(pk[b]); if(tb) params[b] = tb; }
+    /* A param key may itself be a SENTENCE with its own figures -- the
+       cost-matched pricing explanation is one, and it carries the achieved
+       rate, the benchmark, the residual and the numerical root. Resolve it
+       with the same params so those figures reach it; before this it rendered
+       with its placeholders unsubstituted, which is why the sentence used to
+       be passed through as finished English prose instead. */
+    for(var b in pk){ var tb = window.RBF_I18N.t(pk[b], raw); if(tb) params[b] = tb; }
     var out = window.RBF_I18N.t(key, params);
     if(out) return out;
   }
@@ -1190,11 +1228,11 @@ var QUESTIONS = {
     titleKey: "lab.guided.payments.title",
     titleEn: "What share of sales goes to payments?",
     basisKey: "lab.guided.payments.basis",
-    basisEn: "Payment \u00f7 GMV in a month, as a percentage. Summary statistics over the 24-month observation window \u2014 there is no monthly series behind these figures.",
+    basisEn: "Payment \u00f7 GMV in a month, as a percentage. Each figure is computed TWICE: first within one simulated path, over that path's ACTIVE months only \u2014 months with positive revenue and a positive payment \u2014 and then averaged across the 500 paths. So the peak is the average of each path's own worst month, not one worst month across the cohort, and the 90th percentile is the average of path-level 90th percentiles, not a pooled percentile. There is no monthly series behind these figures. Months with zero revenue, and months after the contract completes, are excluded rather than counted as zero burden.",
     cols: function(){ return [
-      t('lab.guided.col.mean',"Mean month"),
-      t('lab.guided.col.p90',"90th percentile"),
-      t('lab.guided.col.peak',"Peak month")
+      t('lab.guided.col.mean',"Mean burden"),
+      t('lab.guided.col.p90',"Mean path-level 90th percentile"),
+      t('lab.guided.col.peak',"Mean path peak")
     ]; },
     cells: function(a){ return [pct(a.burden.mean,2), pct(a.burden.p90,2), pct(a.burden.max,2)]; },
     caveat: function(d){ return apiText(d.metric_definitions.burden,'caveat'); }
@@ -1203,7 +1241,7 @@ var QUESTIONS = {
     titleKey: "lab.guided.recovery.title",
     titleEn: "How much of each repayment target is recovered?",
     basisKey: "lab.guided.recovery.basis",
-    basisEn: "Recorded checkpoints at months 12, 18 and 24 \u2014 not a monthly series. Each contract is measured against its OWN repayment target, and the targets differ.",
+    basisEn: "Recorded checkpoints at months 12, 18 and 24 \u2014 not a monthly series. Each contract is measured against its OWN repayment target, and across these four the targets are not all the same, so a higher percentage does not necessarily mean more VND recovered.",
     cols: function(){ return ["12","18","24"].map(function(m){
       return t('lab.guided.col.byMonth',"By month {m}",{m:m}); }); },
     cells: function(a){ return ["12","18","24"].map(function(m){
@@ -1236,7 +1274,11 @@ function renderGuided(){
     return '<tr><th scope="row"><span class="arm-name">'+esc(apiText(a,'name'))+'</span>'+
            '<span class="arm-id">'+esc(a.id)+'</span>'+
            (note ? '<span class="arm-note">'+esc(note)+'</span>' : '')+'</th>'+
-           q.cells(a).map(function(v){ return '<td class="mono">'+esc(v)+'</td>'; }).join("")+
+           /* data-label carries the column's statistic name into the stacked
+              phone layout, where the header row is not displayed. */
+           q.cells(a).map(function(v,i){
+             return '<td class="mono" data-label="'+esc(cols[i])+'">'+esc(v)+'</td>';
+           }).join("")+
            '</tr>';
   }).join("");
   el("guided-table").innerHTML = '<table class="data guided">'+

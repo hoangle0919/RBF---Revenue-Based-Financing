@@ -285,16 +285,75 @@ def test_the_headline_names_which_two_of_the_four_arms_it_compares():
                 assert cat.get(key, "").strip(), f"{lang} missing {key}"
 
 
-def test_the_headline_does_not_read_a_share_of_target_as_an_amount():
-    """Each arm's denominator is its OWN target, and the targets differ."""
+def test_the_headline_reads_the_targets_instead_of_assuming_they_differ():
+    """FIX-A and RBF-ILL share a target, so a larger share IS a larger amount.
+
+    This test previously enforced the opposite generalisation -- that the two
+    targets differ -- which is false for this pair: both are the 1.20 cap on
+    the same advance, 222,000,000 VND in every registered scenario. The branch
+    is now derived from the target amounts, and this test checks the branch
+    against the amounts rather than pinning one outcome.
+    """
+    seen_same = False
     for scenario in SCENARIOS:
-        s = client.get(f"/api/lab/comparison/{scenario}").json().get("summary") or {}
+        body = client.get(f"/api/lab/comparison/{scenario}").json()
+        s = body.get("summary") or {}
         if not s:
             continue
-        assert "its own repayment target" in s["sentence"] or \
-               "their own repayment target" in s["sentence"], scenario
-        assert "not a comparison of amounts recovered" in s["sentence"] or \
-               "equal shares are not equal amounts" in s["sentence"], scenario
+        arms = {a["id"]: a for a in body["arms"]}
+        fa_t = arms["FIX-A"]["repayment_target"]["amount"]["vnd"]
+        ill_t = arms["RBF-ILL"]["repayment_target"]["amount"]["vnd"]
+        same = fa_t == ill_t
+        assert s["same_target"] is same, scenario
+        if same:
+            seen_same = True
+            assert "compare like for like" in s["sentence"], scenario
+            assert "targets differ" not in s["sentence"], (
+                f"{scenario}: targets are equal ({fa_t}), so this is false")
+            assert s["sentence_key"].endswith("SameTarget"), scenario
+        else:
+            assert "targets differ" in s["sentence"], scenario
+            assert not s["sentence_key"].endswith("SameTarget"), scenario
+        assert "repayment target" in s["sentence"], scenario
+    assert seen_same, "no scenario exercised the equal-target branch"
+
+
+def test_the_unequal_target_branch_is_reachable_and_correct():
+    """Driven directly, because no registered scenario prices this pair apart.
+
+    The general caution still has to be right if an artifact ever does.
+    """
+    from backend import lab as lab_mod
+
+    arms = lab_mod.comparison("stable")["arms"]
+    by = {a["id"]: a for a in arms}
+    fa, ill = dict(by["FIX-A"]), dict(by["RBF-ILL"])
+    ill["repayment_target"] = {
+        **ill["repayment_target"],
+        "amount": {"vnd": 199_000_000, "display": "199,000,000 \u20ab"},
+    }
+    out = lab_mod._summary("stable", [fa, ill])
+    assert out["same_target"] is False
+    assert "targets differ" in out["sentence"]
+    assert "compare like for like" not in out["sentence"]
+    assert out["sentence_key"] == "labpage.summary.sentence"
+    for lang, cat in (("en", EN), ("vi", VI)):
+        for key in ("labpage.summary.sentence",
+                    "labpage.summary.sentenceSameTarget",
+                    "labpage.summary.sentenceLevel",
+                    "labpage.summary.sentenceLevelSameTarget"):
+            assert cat.get(key, "").strip(), f"{lang} missing {key}"
+
+
+def test_the_four_arm_table_keeps_the_general_caution():
+    """Across all FOUR arms the targets are genuinely not all equal."""
+    arms = client.get("/api/lab/comparison/stable").json()["arms"]
+    targets = {a["id"]: a["repayment_target"]["amount"]["vnd"] for a in arms}
+    assert len(set(targets.values())) > 1, targets
+    for lang, cat in (("en", EN), ("vi", VI)):
+        basis = cat["lab.guided.recovery.basis"]
+        assert ("not all the same" in basis
+                or "không giống nhau" in basis), f"{lang}: {basis[:80]}"
 
 
 def test_an_exact_tie_in_month_12_recovery_is_reported_as_level_not_as_more():
@@ -314,14 +373,31 @@ def test_an_exact_tie_in_month_12_recovery_is_reported_as_level_not_as_more():
     fa["recovery_ratio"] = tied
     ill["recovery_ratio"] = dict(tied)          # exact equality at every month
 
+    # Equal targets, which is what the registered artifacts actually give.
     out = lab_mod._summary("stable", [fa, ill])
-    assert out["sentence_key"] == "labpage.summary.sentenceLevel"
+    assert out["sentence_key"] == "labpage.summary.sentenceLevelSameTarget"
     assert out["sentence_param_keys"]["faster"] == "labpage.armRef.both"
     assert "the same share" in out["sentence"]
     assert "has recovered a larger share" not in out["sentence"]
+    assert "the same share is the same amount" in out["sentence"], (
+        "with equal targets, equal shares ARE equal amounts"
+    )
+
+    # Same tie, but priced apart -- then the amounts genuinely differ.
+    ill_apart = dict(ill)
+    ill_apart["repayment_target"] = {
+        **ill["repayment_target"],
+        "amount": {"vnd": 199_000_000, "display": "199,000,000 \u20ab"},
+    }
+    apart = lab_mod._summary("stable", [fa, ill_apart])
+    assert apart["sentence_key"] == "labpage.summary.sentenceLevel"
+    assert "the same share is not the same amount" in apart["sentence"]
+
     for lang, cat in (("en", EN), ("vi", VI)):
-        assert cat.get("labpage.summary.sentenceLevel", "").strip(), f"{lang} missing"
-        assert cat.get("labpage.armRef.both", "").strip(), f"{lang} missing"
+        for key in ("labpage.summary.sentenceLevel",
+                    "labpage.summary.sentenceLevelSameTarget",
+                    "labpage.armRef.both"):
+            assert cat.get(key, "").strip(), f"{lang} missing {key}"
 
 
 def test_the_recovery_finding_handles_a_tie_too():
@@ -343,12 +419,18 @@ def test_the_recovery_finding_handles_a_tie_too():
 LAB_SRC = (ROOT / "frontend" / "lab.html").read_text(encoding="utf-8")
 
 
-def test_one_question_selector_drives_both_the_card_and_the_chart():
-    """Not three competing controls.
+def test_one_question_selector_drives_the_guided_table():
+    """Not three competing controls -- and TABLE-FIRST, not charts.
 
-    The review asked for a single synchronised selection rather than question
-    cards plus a separate chart selector plus mobile tabs. There is exactly one
-    `#showme` group, and the mobile layout wraps it rather than duplicating it.
+    This test was previously named "...drives both the card and the chart" and
+    the commit message claimed synchronised charts. That was wrong:
+    `selectQuestion()` calls `renderGuided()` and nothing else, so the selector
+    changes the guided TABLE only; the detail charts live in their own optional
+    panels and are drawn when a panel opens. A table-first guided layer with
+    optional chart panels is the actual design, and this test now describes it.
+
+    What the single-selector requirement does mean is still checked: exactly
+    one `#showme` group, which the mobile layout wraps rather than duplicating.
     """
     assert LAB_SRC.count('id="showme"') == 1
     assert LAB_SRC.count('data-q="payments"') == 1
@@ -361,6 +443,15 @@ def test_one_question_selector_drives_both_the_card_and_the_chart():
             assert cat.get(key, "").strip(), f"{lang} missing {key}"
     assert not re.search(r">\s*Q[123]\s*<", LAB_SRC), "Q numbers are not descriptive labels"
 
+    # TABLE-FIRST: the selector re-renders the table and does not open or
+    # switch a chart. If that ever changes, this test should change with it.
+    fn = LAB_SRC.split("function selectQuestion(key){", 1)[1].split("\n}", 1)[0]
+    assert "renderGuided()" in fn
+    for charty in ("drawCharts", "chart-burden", "chart-recovery", ".open"):
+        assert charty not in fn, (
+            f"selectQuestion touches {charty!r}; the selector is table-only, so "
+            "either this test or the claim about it needs updating")
+
 
 def test_the_guided_layer_claims_no_time_series():
     """Burden is summary statistics and recovery is recorded checkpoints.
@@ -369,11 +460,48 @@ def test_the_guided_layer_claims_no_time_series():
     """
     assert "over time" not in LAB_SRC.lower()
     for lang, cat in (("en", EN), ("vi", VI)):
-        basis = cat["lab.guided.payments.basis"]
+        basis = cat["lab.guided.payments.basis"].lower()
         assert ("no monthly series" in basis
                 or "không có chuỗi số liệu theo từng tháng" in basis), lang
-        rec = cat["lab.guided.recovery.basis"]
+        rec = cat["lab.guided.recovery.basis"].lower()
         assert ("checkpoints" in rec or "mốc được ghi nhận" in rec), lang
+
+
+def test_the_burden_labels_describe_the_two_stage_aggregation():
+    """`burden_max` is the MEAN of per-path peaks, not one worst month.
+
+    `research/rbf_sim/metrics.py::burden_stats` computes each statistic within
+    one path over its ACTIVE months only -- positive revenue and a positive
+    payment -- and `research/rbf_sim/engine.py` then averages each of those
+    across the 500 paths. "Peak month" and "90th percentile" described neither
+    stage, so a reader comparing contracts standalone would have read them as
+    cohort-wide figures.
+
+    Presentation only. No value changes.
+    """
+    for lang, cat in (("en", EN), ("vi", VI)):
+        peak = cat["lab.guided.col.peak"].lower()
+        p90 = cat["lab.guided.col.p90"].lower()
+        assert ("mean" in peak or "trung bình" in peak), f"{lang}: {peak}"
+        assert ("mean" in p90 or "trung bình" in p90), f"{lang}: {p90}"
+        assert peak != "peak month" and p90 != "90th percentile", lang
+
+        basis = cat["lab.guided.payments.basis"].lower()
+        assert ("active months" in basis or "tháng có hoạt động" in basis), lang
+        assert ("averaged across" in basis or "lấy trung bình trên" in basis), lang
+        # zero-revenue months must not read as zero-burden observations
+        assert ("excluded" in basis or "bị loại trừ" in basis), lang
+
+
+def test_the_aggregation_described_matches_the_simulation_source():
+    """Pins the description against the code it describes."""
+    metrics = (ROOT / "research" / "rbf_sim" / "metrics.py").read_text(encoding="utf-8")
+    engine = (ROOT / "research" / "rbf_sim" / "engine.py").read_text(encoding="utf-8")
+    # per-path, active months only
+    assert "if b is not None and p > 0" in metrics
+    # then averaged across paths
+    assert '"burden_max":   _mean([r.burden["max"] for r in rs])' in engine
+    assert '"burden_p90":   _mean([r.burden["p90"] for r in rs])' in engine
 
 
 def test_every_guided_figure_names_its_contract_and_its_statistic():
@@ -434,3 +562,35 @@ def test_a_chart_in_a_closed_panel_is_drawn_when_the_panel_opens():
 def test_the_eight_label_jump_bar_is_gone():
     """It was the default visitor journey the redesign replaces."""
     assert 'class="jump"' not in LAB_SRC
+
+
+# ── R1: the guided result must be readable on a phone ──────────────────────
+
+def test_the_guided_table_is_not_locked_to_the_wide_min_width_on_a_phone():
+    """`table.data` carries min-width:760px. Inherited by the guided table that
+    put a 760px table in a 313px viewport, so `overflow-x:auto` hid the actual
+    answers behind a sideways scroll -- and a page-width overflow check passed
+    while the core task failed.
+    """
+    assert "#guided-table{container-type:inline-size;}" in LAB_SRC
+    assert "#guided-table table.guided{min-width:0;width:100%;}" in LAB_SRC, (
+        "display:block alone does not relax min-width"
+    )
+
+
+def test_each_guided_value_carries_its_statistic_name_into_the_stacked_layout():
+    """The header row is hidden when stacked, so the label travels per cell."""
+    assert "data-label=\"'+esc(cols[i])+'\"" in LAB_SRC
+    assert "content:attr(data-label)" in LAB_SRC
+
+
+def test_the_stacked_guided_cell_stacks_rather_than_sharing_one_flex_line():
+    """A single flex line fits "Mean burden" and overflows the card for
+    "Mean path-level 90th percentile" -- measured at 435px against a 359px
+    card edge. Blocks cannot overflow at any label length."""
+    block = LAB_SRC.split("@container (width < 620px){", 1)[1].split("\n}", 1)[0]
+    assert "#guided-table td{text-align:left;padding:8px 0;display:block;" in block
+    assert "display:flex" not in block, (
+        "a flex row re-introduces the long-label overflow"
+    )
+    assert "content:attr(data-label) / attr(data-label);\n    display:block" in block
