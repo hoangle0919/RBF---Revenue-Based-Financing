@@ -27,15 +27,56 @@ const start = source.indexOf('const HERO_FIXED=');
 const end = source.indexOf('/* Premium scroll-reveal', start);
 assert(start > 0 && end > start, 'prototype state-function boundaries exist');
 const hero = source.slice(start, end);
+// Execute the actual money helpers too: clearHeroResult now depends on
+// unbindMoney. A no-op mock would hide the stale-USD regression being guarded.
+const moneyStart = source.indexOf('function bindMoney(');
+const moneyEnd = source.indexOf('const fmtVND =', moneyStart);
+assert(moneyStart > 0 && moneyEnd > moneyStart, 'money-helper boundaries exist');
+const money = source.slice(moneyStart, moneyEnd);
+const FX = readFileSync(join(__dirname, '../frontend/fx-display.js'), 'utf8');
+const VI = JSON.parse(readFileSync(join(__dirname, '../frontend/i18n/vi.json'), 'utf8'));
+
+function makeNode() {
+  const node = {
+    attrs: {}, value: '1', min: '0', max: '1000', textContent: '', innerHTML: '',
+    hidden: false, disabled: false, style: {}, className: '',
+    nextElementSibling: null, previousElementSibling: null,
+    addEventListener() {},
+    setAttribute(k, v) { this.attrs[k] = String(v); },
+    getAttribute(k) { return Object.hasOwn(this.attrs, k) ? this.attrs[k] : null; },
+    removeAttribute(k) { delete this.attrs[k]; },
+    insertAdjacentElement(position, child) {
+      assert.equal(position, 'afterend');
+      child.previousElementSibling = this;
+      child.nextElementSibling = this.nextElementSibling;
+      if (this.nextElementSibling) this.nextElementSibling.previousElementSibling = child;
+      this.nextElementSibling = child;
+    },
+    remove() {
+      if (this.previousElementSibling) this.previousElementSibling.nextElementSibling = this.nextElementSibling;
+      if (this.nextElementSibling) this.nextElementSibling.previousElementSibling = this.previousElementSibling;
+      this.previousElementSibling = this.nextElementSibling = null;
+    },
+  };
+  node.classList = {
+    contains(c) { return node.className.split(/\s+/).includes(c); },
+    toggle(c, force) {
+      const classes = new Set(node.className.split(/\s+/).filter(Boolean));
+      const on = force === undefined ? !classes.has(c) : force;
+      if (on) classes.add(c); else classes.delete(c);
+      node.className = [...classes].join(' ');
+      return on;
+    },
+    add(c) { this.toggle(c, true); },
+    remove(c) { this.toggle(c, false); },
+  };
+  return node;
+}
 
 function setup() {
   const nodes = new Map();
   const get = id => {
-    if (!nodes.has(id)) nodes.set(id, {
-      value: '1', min: '0', max: '1000', textContent: '', innerHTML: '',
-      hidden: false, disabled: false, style: {}, className: '',
-      classList: { add() {}, remove() {}, toggle() {} }, addEventListener() {},
-    });
+    if (!nodes.has(id)) nodes.set(id, makeNode());
     return nodes.get(id);
   };
   const values = { 'hc-rev':185, 'hc-growth':22, 'hc-return':2.8,
@@ -44,31 +85,62 @@ function setup() {
   const ranges = Object.keys(values).map(get);
   const presets = [{}, {}, {}, {}].map(() => ({ classList: { toggle() {}, remove() {} } }));
   const requests = [], results = [];
+  const listeners = {};
+  const document = {
+    readyState: 'complete', visibilityState: 'visible',
+    getElementById: get,
+    createElement: makeNode,
+    addEventListener() {},
+    querySelectorAll(selector) {
+      if (selector === '[data-vnd]') return [...nodes.values()].filter(n => n.getAttribute('data-vnd') !== null);
+      if (selector === '[data-fx-note]') return [get('workbench-fx-note')];
+      if (selector === '[data-fx-option]') return [];
+      return selector.includes('input') ? ranges : presets;
+    },
+  };
+  const window = {
+    document, scrollTo() {}, setInterval() { return 1; },
+    localStorage: { getItem() { return null; }, setItem() {} },
+    addEventListener(type, fn) { listeners[type] = fn; },
+    RBF_I18N: {
+      lang: 'en',
+      t(key, vars) {
+        if (this.lang === 'en') return translate(key, vars);
+        assert(Object.hasOwn(VI, key), 'missing Vietnamese key: ' + key);
+        let text = VI[key];
+        for (const [k, v] of Object.entries(vars || {})) text = text.split('{' + k + '}').join(String(v));
+        return text;
+      },
+    },
+  };
+  // Explicit synthetic FX fixture; never contacts a rate provider or production.
+  const quote = { status: 'ok', vnd_per_usd: '25000', reference_date: new Date().toISOString().slice(0, 10) };
   const context = vm.createContext({
-    document: { getElementById:get, querySelectorAll:selector => selector.includes('input') ? ranges : presets },
+    document, window,
+    fetch: async () => ({ ok: true, json: async () => quote }),
     URLSearchParams, performance: { now:() => 100 },
     fmtVND:String, pct:String, signed:String,
     t: translate,
     setElText: (el, key, vars) => { if (el) el.textContent = translate(key, vars); },
     setI18nText: (id, key, vars) => { get(id).textContent = translate(key, vars); },
     VERDICT: { APPROVED:'demo.verdict.approved' },
-    // Money writes route through setMoney(), which also binds data-vnd for the
-    // USD pass. The harness records the bound integer so tests can assert the
-    // authoritative number, not the formatted text.
-    bindMoney: (el, vnd) => { if (el) el.attrs = Object.assign(el.attrs||{}, {'data-vnd': String(vnd)}); },
-    setMoney: (id, vnd) => { const e = get(id); e.textContent = String(vnd);
-                             e.attrs = Object.assign(e.attrs||{}, {'data-vnd': String(vnd)}); },
     // Display labels for the engine's own tier values, keyed like the page.
     // An unrecognised tier falls through to the API's own string.
     TIER_LABEL: { 'Low Risk':'demo.tier.low', 'Medium Risk':'demo.tier.medium',
                   'High Risk':'demo.tier.high' },
     callAPI:route => new Promise(resolve => requests.push({route, resolve})),
     clearTimeout() {}, setTimeout:() => 1,
-    renderResult:value => results.push(value), go() {}, window: { scrollTo() {} },
+    renderResult:value => results.push(value), go() {},
   });
-  vm.runInContext(hero, context);
+  vm.runInContext(FX, context);
+  vm.runInContext(money + '\n' + hero, context);
   const run = code => vm.runInContext(code, context);
-  return { get, run, requests, results };
+  return { get, run, requests, results, fx: window.RBF_FX, quote,
+    setLanguage(lang) {
+      window.RBF_I18N.lang = lang;
+      listeners['rbf:languagechange']();
+    },
+  };
 }
 function payload(amount = 100) {
   return { decision:'APPROVED', risk_tier:'LOW', pd_score:0.1,
@@ -155,4 +227,46 @@ test('render exceptions clear partial values and replace the footer without leak
   assert.match(s.get('hero-foot').textContent, /No example figures are shown/);
   assert(!s.get('hero-foot').textContent.includes('PRIVATE_RENDER_ERROR'));
   assert(s.get('hero-full-link').disabled);
+  s.fx.render();
+  assert.equal(s.get('hd-limit').getAttribute('data-vnd'), null);
+  assert.equal(s.get('hd-limit').nextElementSibling, null);
+});
+
+function assertNoOutputCurrency(s) {
+  for (const id of ['hd-tier', 'hd-limit', 'hd-rate', 'hd-pd', 'hd-dur', 'hd-apr']) {
+    assert.equal(s.get(id).textContent, '—', id);
+    assert.equal(s.get(id).getAttribute('data-vnd'), null, id);
+    assert.equal(s.get(id).nextElementSibling, null, id);
+  }
+}
+
+test('pending preview stays cleared through FX repaint, refresh, currency and language changes', async () => {
+  const s = setup();
+  await finish(s.requests[0], payload(185000000));
+  assert.match(s.get('hd-limit').nextElementSibling.textContent, /7,400\.00/);
+  assert.match(s.get('workbench-fx-note').textContent, new RegExp(s.quote.reference_date));
+  s.run('heroOnInput()');
+  assertNoOutputCurrency(s);
+  s.fx.render();
+  await s.fx.refresh();
+  s.fx.setMode('vnd');
+  s.fx.setMode('dual');
+  s.setLanguage('vi');
+  assertNoOutputCurrency(s);
+  // The input is still current: clearing stale OUTPUT must not clear its hint.
+  assert.equal(s.get('hv-rev').getAttribute('data-vnd'), '185000000');
+  assert.match(s.get('hv-rev').nextElementSibling.textContent, /7\.400,00/);
+});
+
+test('failed preview cannot restore a previous USD result on the next FX refresh', async () => {
+  const s = setup();
+  await finish(s.requests[0], payload(185000000));
+  assert(s.get('hd-limit').nextElementSibling);
+  s.run('heroRunPreview()');
+  await finish(s.requests[1], null);
+  await s.fx.refresh();
+  s.setLanguage('vi');
+  assertNoOutputCurrency(s);
+  assert(s.get('hero-full-link').disabled);
+  assert.equal(s.get('hero-retry').hidden, false);
 });

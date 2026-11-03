@@ -21,3 +21,21 @@ inside the card at every label length.
 
 The images are JPEG captures scaled for size; the numeric claims in
 `../verification.md` come from measured geometry, not from reading these.
+
+## Follow-up correction — 3 November 2026
+
+The earlier assertion "inside the card at every label length" was too broad.
+The prior pair showed an improvement in value placement, but inherited nowrap
+still clipped Vietnamese labels and the tablet breakpoint still hid values.
+The following captures are after the F1/F2 correction, based on `548956e` plus
+the focused follow-up. Their actual viewports were checked at capture time.
+
+| file | page | viewport | language |
+|---|---|---|---|
+| `lab-360x800-vi-followup-wrap.jpg` | guided Payments, sustained decline; full labels wrap | 360×800 | Vietnamese |
+| `lab-768x844-vi-followup-fit.jpg` | same question/scenario; tablet cards expose all columns | 768×844 | Vietnamese |
+
+Guided client/scroll widths are 283/283px and 671/671px respectively. The
+measurements cover complete cells, not just the visible crop; see the 108-state
+matrix and its limits in `../verification.md`. These are in-app-browser
+captures, not physical iPhone/Safari or assistive-technology tests.

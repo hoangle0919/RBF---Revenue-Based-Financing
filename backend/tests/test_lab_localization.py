@@ -587,10 +587,32 @@ def test_each_guided_value_carries_its_statistic_name_into_the_stacked_layout():
 def test_the_stacked_guided_cell_stacks_rather_than_sharing_one_flex_line():
     """A single flex line fits "Mean burden" and overflows the card for
     "Mean path-level 90th percentile" -- measured at 435px against a 359px
-    card edge. Blocks cannot overflow at any label length."""
-    block = LAB_SRC.split("@container (width < 620px){", 1)[1].split("\n}", 1)[0]
+    card edge. Stacking needs wrapping too; display:block alone is not enough."""
+    block = LAB_SRC.split("@container (width < 48rem){", 1)[1].split("\n}", 1)[0]
     assert "#guided-table td{text-align:left;padding:8px 0;display:block;" in block
     assert "display:flex" not in block, (
         "a flex row re-introduces the long-label overflow"
     )
     assert "content:attr(data-label) / attr(data-label);\n    display:block" in block
+
+
+def test_guided_table_fit_budget_matches_the_stacking_boundary():
+    """A 620px boundary left the inherited 760px table clipped on tablets.
+
+    Structural guard only; executed browser geometry is recorded separately.
+    The relative budget also responds to an enlarged root font size.
+    """
+    budget = re.search(r"#guided-table table\.guided\{min-width:(\d+(?:\.\d+)?rem);", LAB_SRC)
+    assert budget, "the guided table needs a text-relative minimum width"
+    assert f"@container (width < {budget[1]}){{" in LAB_SRC
+    assert float(budget[1][:-3]) * 16 >= 760, "do not leave a gap below the base table's minimum"
+
+
+def test_stacked_guided_labels_override_inherited_nowrap():
+    """The values fitted while the longer Vietnamese pseudo-labels clipped."""
+    block = LAB_SRC.split("@container (width < 48rem){", 1)[1].split("\n}", 1)[0]
+    cell = re.search(r"(?m)^  #guided-table td\{([^}]+)\}", block)[1]
+    label = re.search(r"#guided-table td::before\{([^}]+)\}", block)[1]
+    assert "white-space:normal" in cell
+    assert "white-space:normal" in label
+    assert "overflow-wrap:anywhere" in label

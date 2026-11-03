@@ -208,3 +208,114 @@ Before: client 313 / scroll 760.
 
 Residual-English, Vietnamese, all panels expanded, with the sentence-splitting
 scanner: `/lab` 487 nodes, **0 suspects**.
+
+---
+
+# F1–F3 follow-up — 3 November 2026
+
+Codex implemented the bounded follow-up after the user asked it to take over
+from Claude. Starting point: clean `codex/bilingual-daily-fx` at
+`548956eff8cc56e1bbbd7cb11de092353c90298b`. This entry records the new
+verification; it does not turn the earlier checks into passes they did not earn.
+
+## Corrections
+
+- **F1, tablet fit:** the guided table's minimum and its card-layout boundary
+  now share `48rem`. Previously the 620px boundary left a gap below the
+  inherited 760px minimum. The new boundary is relative to text size; no
+  overflow hiding, label truncation or font shrinking was introduced.
+- **F2, Vietnamese labels:** stacked cells and their pseudo-labels explicitly
+  override inherited `white-space:nowrap`. Complete labels wrap above values.
+  `display:block` alone did not establish that, and the old universal
+  no-overflow wording in the CSS and test was corrected.
+- **F3, prototype harness:** the existing state suite now loads the actual
+  money helpers and actual `fx-display.js`, with attribute/sibling/removal
+  support in its fake DOM. All seven original cases remain. Two new cases
+  exercise pending/failed results through real FX repaint/refresh, currency
+  selection and Vietnamese language-change handling, using an explicitly
+  synthetic quote. The separate five-test FX suite remains unchanged.
+
+The earlier reported `390px` guided width of `328px` did not cover the
+scrollbar-reserved case: the follow-up reproduced client width 313px with
+328px of content before this correction. Likewise, tablet values remained
+hidden at client width 671px with a 760px table. Both gaps are closed in the
+executed cases below, not by a page-width-only assertion.
+
+## Executed layout evidence
+
+The local read-only preview served the existing registered Lab output.
+The in-app browser reserved 15px for its vertical scrollbar. Checks measured
+the guided container, cell overflow (including pseudo-labels), and numeric
+value bounds; screenshots supplement rather than replace those measurements.
+
+| Viewport width | Guided client / scroll width | Layout |
+|---:|---:|---|
+| 320 | 243 / 243 | cards |
+| 360 | 283 / 283 | cards |
+| 390 | 313 / 313 | cards |
+| 768 | 671 / 671 | cards |
+| 864 | 767 / 767 | cards |
+| 865 | 768 / 768 | table |
+| 866 | 769 / 769 | table |
+| 1366 | 1038 / 1038 | table |
+| 1440 | 1038 / 1038 | table |
+
+- **54 states:** these nine widths × English/Vietnamese × all three guided
+  questions, under sustained decline. Zero overflowing cells, zero numeric
+  values outside the container and no guided horizontal overflow. The
+  767/768/769px component widths cover below/at/above the stacking boundary.
+- **36 additional states:** stable, temporary closure and month-13 closure ×
+  360/768px × both languages × all three questions. The actual viewport and
+  selected scenario were checked, not just requested. Same zero-overflow result.
+- **18 enlarged-text states:** 390/768/1366px × both languages × all questions
+  under sustained decline, with an ephemeral preview fixture setting the root
+  font to 200% (computed 32px). All stacked with no cell/container overflow or
+  outside values. This is a text-size fixture, **not** browser-zoom, Safari,
+  physical-phone or screen-reader certification.
+
+Raw measurements: `followup-geometry-2026-11-03.json` (54 + 36 + 18 states).
+New screenshots: `screenshots/lab-360x800-vi-followup-wrap.jpg` and
+`screenshots/lab-768x844-vi-followup-fit.jpg`.
+
+One collection attempt targeted the normal tab while the viewport override
+applied to the selected enlarged-text tab. Its nominal-width measurements and
+two screenshots were discarded. The affected 36-state matrix and screenshots
+were rerun with the intended tab selected and actual viewport width verified;
+only the corrected outputs are saved here.
+
+## Executed tests and preservation
+
+| Gate | Result |
+|---|---|
+| Backend pytest, isolated temporary database, localhost allowed | **685 passed, 11 skipped** |
+| Focused Lab localization suite | **67 passed** (included in backend count) |
+| `check_i18n_fx_state.cjs` | **11 passed** |
+| `check_prototype_state.cjs` | **9 passed** (seven original + two new) |
+| `check_prototype_fx_state.cjs` | **5 passed** |
+| `test_scan_residual_english.cjs` | **5 passed** |
+| Catalogue check | **775 English / 775 Vietnamese**, all 625 referenced keys resolve |
+| Tracked `research/results/` files and publication PDFs vs `c98d02c` | **29/29 byte-identical** |
+
+The 11 skips are nine automated browser tests (Chromium executable absent),
+one opt-in live FX-provider smoke test, and one scorer comparison without an
+ensemble artifact. None is counted as a pass. The interactive layout matrix
+above is separate from those skipped automated tests. No new simulation run
+or live FX-source verification was performed for this CSS/harness correction.
+
+As a negative control, removing `unbindMoney(el)` from the extracted hero code
+in memory made **three of the nine state tests fail** (render exception and
+both new currency-lifecycle cases). The ordinary suite passes all nine. This
+shows the checks detect stale bindings rather than merely supplying a no-op
+helper; the mutation was not written to the repository.
+
+## Remaining boundaries and handoff
+
+F1–F3 are addressed by this pass. The existing first-viewport qualification in
+C3 still stands: bare prototype entry and the homepage's anchored entry are
+different routes. This pass does not claim to resolve every design target or
+translate a heuristic scan into complete accessibility/translation proof.
+
+No engine, research artifact, paper, API schema, scoring implementation or
+production database changed. No submissions, administrator notifications,
+VoiceOver, push, merge or deployment occurred. The only application change is
+guided-table CSS; other changes are regression tests and evidence.

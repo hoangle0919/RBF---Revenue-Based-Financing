@@ -97,11 +97,15 @@ section{margin-bottom:26px;scroll-margin-top:96px;}
 /* R1: the guided table carried table.data's min-width:760px into a 313px
    phone viewport, so overflow-x:auto hid the actual answers behind a sideways
    scroll -- a page-width overflow check passes while the core task fails.
-   Below 620px each contract becomes a labelled card instead. The label text
+   The table and stacking query share a 48rem fit budget, so there is no
+   tablet-width interval with a table wider than its container. Using rem also
+   increases that budget when the reader enlarges the default text size.
+   Below that width each contract becomes a labelled card. The label text
    is written to data-label by renderGuided(), because the column count differs
    per question and a fixed --l2..--l7 scheme cannot cover that. */
 #guided-table{container-type:inline-size;}
-@container (width < 620px){
+#guided-table table.guided{min-width:48rem;}
+@container (width < 48rem){
   #guided-table table,#guided-table thead,#guided-table tbody,
   #guided-table tr,#guided-table th,#guided-table td{display:block;}
   /* display:block alone does not relax min-width, and that min-width is what
@@ -112,19 +116,20 @@ section{margin-bottom:26px;scroll-margin-top:96px;}
     padding:10px 12px 6px;margin:0 0 10px;}
   #guided-table tbody th{text-align:left;font-weight:600;padding:0 0 8px;
     border-bottom:1px solid var(--line);}
-  #guided-table td{text-align:left;padding:8px 0;display:block;
+  #guided-table td{text-align:left;padding:8px 0;display:block;white-space:normal;
     border-bottom:1px solid var(--line);}
   #guided-table tr td:last-child{border-bottom:none;}
   /* Label ABOVE the value, both as blocks. A single flex line put the label
      and the value side by side, which worked for "Mean burden" and pushed the
      value 76px outside the card for "Mean path-level 90th percentile" -- the
-     longer, accurate label. Stacking cannot overflow at any label length.
+     longer, accurate label. Stacking alone is not enough: the table's nowrap
+     rule must be overridden so the full translated label can wrap as well.
      The slash form asks for the label to be announced without the trailing
      colon; how a given screen reader actually announces it is NOT established
      by this CSS. */
   #guided-table td::before{content:attr(data-label) / attr(data-label);
     display:block;font-weight:400;color:var(--muted);font-size:.8rem;
-    line-height:1.4;margin-bottom:2px;}
+    line-height:1.4;margin-bottom:2px;white-space:normal;overflow-wrap:anywhere;}
 }
 /* Optional detail panels. The guided card answers the three primary questions;
    these hold the full chart, the per-arm detail and the measurement notes. */
