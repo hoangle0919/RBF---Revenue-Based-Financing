@@ -6,9 +6,21 @@
  * that the i18n pass did not reach. Anything in tools/residual_english.json is
  * exempt, with that file recording why.
  *
- * It is a HEURISTIC and reports suspects, not verdicts: a Vietnamese sentence
- * with no diacritics would be missed, and a proper name not yet listed shows
- * up as a false positive. Read every line it prints before accepting a zero.
+ * It is a HEURISTIC and reports suspects, not verdicts. Known limits:
+ *   - a Vietnamese sentence with no diacritics is missed;
+ *   - a proper name not yet listed shows up as a false positive;
+ *   - text inside <noscript> is inert and cannot be reached by any runtime.
+ *
+ * MIXED-LANGUAGE BLINDNESS, and the partial fix. The node-level diacritic test
+ * below skips an ENTIRE text node as soon as it contains one Vietnamese
+ * character. A Vietnamese wrapper around a whole English paragraph therefore
+ * produced a FALSE NEGATIVE -- which is exactly how an untranslated pricing
+ * explanation survived a "0 suspects" result. scanResidualEnglish now also
+ * splits each node into sentences and tests them individually, so an English
+ * sentence sitting beside Vietnamese ones is reported.
+ *
+ * A "0 suspects" result is a SCANNER result, not a proof of translation
+ * completeness. Read every line it prints before accepting a zero.
  *
  * Usage: scanResidualEnglish()           -> the current scenario / page state
  *        scanResidualEnglish({openAll:1}) -> opens every <details> first
@@ -43,12 +55,26 @@ function scanResidualEnglish(opts) {
     total++;
     if (ALLOW.test(text)) continue;
     if (parent.closest('[aria-hidden="true"]')) continue;   // decorative
-    if (VI_DIACRITIC.test(text)) continue;
-    if (EN.test(text)) {
-      suspects.push({
-        at: parent.id || (parent.tagName + '.' + (parent.className || '-')),
-        text: text.slice(0, 120),
-      });
+
+    // Sentence-level, not node-level. A node that mixes languages is the case
+    // the node-level diacritic test was blind to.
+    var sentences = text.split(/(?<=[.!?:])\s+/).filter(function (x) {
+      return x.trim().length >= 25;           // ignore fragments and labels
+    });
+    var units = sentences.length > 1 ? sentences : [text];
+
+    for (var u = 0; u < units.length; u++) {
+      var unit = units[u].trim();
+      if (!unit || ALLOW.test(unit)) continue;
+      if (VI_DIACRITIC.test(unit)) continue;
+      if (EN.test(unit)) {
+        suspects.push({
+          at: parent.id || (parent.tagName + '.' + (parent.className || '-')),
+          text: unit.slice(0, 120),
+          mixedNode: units.length > 1 && VI_DIACRITIC.test(text),
+        });
+        break;                                 // one report per node is enough
+      }
     }
   }
   return { nodes: total, suspects: suspects.length, list: suspects };
