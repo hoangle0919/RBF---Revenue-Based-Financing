@@ -136,3 +136,75 @@ deployment occurred. The preview endpoint is read-only; the write paths
 - The dashboard language repaint was exercised with a **stubbed dataset
   injected into the page**, not with real admin data — that needs credentials
   which were not entered.
+
+
+---
+
+# Corrections to this record — 3 November 2026
+
+An independent review of `34d40e7` found four claims in the record above that
+were wrong or ambiguously stated. They are corrected here rather than edited
+away, so the error and its correction both stay on file.
+
+## C1 — "the selector drives the card and its chart" was false
+
+`selectQuestion()` calls `renderGuided()` and nothing else. The selector
+changes the guided **table** only; the detail charts live in their own
+optional panels and are drawn when a panel opens. The Phase C commit message
+claimed synchronised charts and the test was named
+`test_one_question_selector_drives_both_the_card_and_the_chart`, which checked
+button counts and labels — not chart behaviour — so the name asserted
+something the test never verified.
+
+The design is **table-first with optional chart panels**. That is now what the
+test is named, what it describes, and what it asserts: it additionally checks
+that `selectQuestion` touches no chart function, so the claim and the code
+cannot drift apart again.
+
+## C2 — "IN" was ambiguous and overstated in one row
+
+In the Lab table above, "IN" meant *starts within the viewport*, not *fully
+visible*. For `390×844 VI selector 829–933 IN` that reads as a pass when the
+element spans 104px and only the first 15px are above an 844px fold. The
+honest statement is: **the question selector begins just inside the fold at
+390×844 and is mostly below it.** The desktop rows that say FULLY IN were
+measured as fully inside and are unchanged.
+
+## C3 — the first-viewport target is still only partly met
+
+Confirmed, not disputed. A bare Vietnamese prototype load without a fragment
+places the first revenue slider and the result box below the fold; the
+`#prototype` shortcut from the homepage is what brings the workbench into
+view. Bare-page entry and anchored entry are different routes and are reported
+separately from now on.
+
+## C4 — the evidence directory held no images
+
+Correct. It now does: `screenshots/`, with the R1 before/after pair.
+
+## C5 — what the mixed-language scan result actually meant
+
+The earlier "0 suspects" for `/lab?lang=vi` was a **scanner** result, not a
+translation-completeness result. The scanner skipped any text node containing
+a Vietnamese diacritic, so a Vietnamese wrapper around an English paragraph
+was invisible to it — which is exactly how the untranslated pricing
+explanation survived. The scanner now splits nodes into sentences, a fixture
+file pins the mixed case, and the scanner's header states the remaining limits
+in the result itself.
+
+## Re-run after the R1–R5 corrections
+
+| gate | result |
+|---|---|
+| `python3 -m pytest backend/tests -q` | **683 passed, 11 skipped, 0 failed** |
+| `python3 tools/check_i18n.py` | OK — 775 / 775, parity |
+| `node tools/check_i18n_fx_state.cjs` | 11 passed, 0 failed |
+| `node tools/check_prototype_fx_state.cjs` | 5 passed, 0 failed |
+| `node tools/test_scan_residual_english.cjs` | 5 passed, 0 failed |
+
+Measured after R1, 390×844 Vietnamese, all three questions:
+`scrollWidth == clientWidth == 328`, **zero values outside the card**.
+Before: client 313 / scroll 760.
+
+Residual-English, Vietnamese, all panels expanded, with the sentence-splitting
+scanner: `/lab` 487 nodes, **0 suspects**.
