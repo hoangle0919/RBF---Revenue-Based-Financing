@@ -56,7 +56,7 @@ p{margin:0 0 1em;}
 .banner .wrap{display:flex;gap:10px;align-items:flex-start;}
 .banner strong{color:#fff;}
 
-header.hero{background:var(--surface);border-bottom:1px solid var(--hairline);padding:38px 0 28px;}
+header.hero{background:var(--surface);border-bottom:1px solid var(--hairline);padding:26px 0 20px;}
 .eyebrow{font-size:.72rem;text-transform:uppercase;letter-spacing:.13em;color:var(--faint);
   font-weight:700;margin-bottom:10px;}
 .lede{font-size:clamp(.98rem,2vw,1.1rem);color:var(--muted);max-width:64ch;}
@@ -76,7 +76,7 @@ nav.jump a{font-size:.76rem;color:var(--muted);text-decoration:none;padding:4px 
 nav.jump a:hover,nav.jump a:focus-visible{border-color:var(--accent);color:var(--accent);}
 
 main{padding:28px 0 60px;}
-section{margin-bottom:34px;scroll-margin-top:96px;}
+section{margin-bottom:26px;scroll-margin-top:96px;}
 .card{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);
   padding:20px;box-shadow:var(--shadow);}
 
@@ -91,7 +91,51 @@ section{margin-bottom:34px;scroll-margin-top:96px;}
 .scn button:hover{border-color:var(--accent);color:var(--accent);}
 .scn button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff;}
 .scn button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-.scn-desc{color:var(--muted);font-size:.9rem;margin:10px 0 0;}
+.about-study{margin-top:16px}
+.about-study>summary h3{margin:0!important;display:inline;font-size:.95rem}
+.lab-opener{margin:10px 0 0;font-size:1rem;line-height:1.6;max-width:62ch;color:var(--ink)}
+/* Optional detail panels. The guided card answers the three primary questions;
+   these hold the full chart, the per-arm detail and the measurement notes. */
+.panel>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;min-height:44px}
+.panel>summary::-webkit-details-marker{display:none}
+.panel>summary:before{content:"+";font-size:1.1rem;line-height:1;color:var(--muted)}
+.panel[open]>summary:before{content:"\2212"}
+.panel>summary h2{margin:0!important;display:inline}
+.panel>summary:hover:before{color:var(--ink)}
+.panel[open]>summary{margin-bottom:10px}
+/* ── guided layer ─────────────────────────────────────────────────────────── */
+.starters{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px}
+.starters button{font:inherit;font-size:.88rem;padding:11px 14px;min-height:44px;cursor:pointer;
+  background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:2px}
+.starters button:hover{border-color:var(--ink)}
+.starters button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.all-scn{margin:0 0 4px}
+.all-scn>summary{cursor:pointer;font-size:.86rem;color:var(--muted);min-height:44px;display:inline-flex;align-items:center}
+.all-scn>summary:hover{color:var(--ink)}
+.showme-h{font-size:.74rem!important;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 8px!important}
+.showme{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.showme button{font:inherit;font-size:.92rem;padding:12px 18px;min-height:44px;cursor:pointer;
+  background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:2px}
+.showme button:hover{border-color:var(--ink)}
+.showme button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:600}
+.guided-card{border:1px solid var(--line);background:#fff;padding:18px 20px}
+.guided-card h3{margin:0 0 6px;font-size:1.12rem;line-height:1.35}
+.guided-basis{margin:0 0 14px;font-size:.86rem;line-height:1.6;color:var(--muted)}
+.guided-table{overflow-x:auto}
+table.guided th[scope="row"]{text-align:left;font-weight:600;line-height:1.35}
+table.guided .arm-name{display:block}
+table.guided .arm-id{display:inline-block;margin-top:3px;font-size:.7rem;letter-spacing:.06em;
+  color:var(--muted);font-weight:400;font-family:var(--mono,monospace)}
+table.guided .arm-note{display:block;margin-top:3px;font-size:.74rem;font-weight:400;color:var(--muted);line-height:1.45}
+table.guided td{text-align:right;white-space:nowrap}
+.guided-card .warn{margin-top:14px}
+@media(max-width:560px){
+  .guided-card{padding:14px 15px}
+  .showme button{flex:1 1 auto;padding:12px 12px;font-size:.86rem}
+  .starters button{flex:1 1 calc(50% - 4px);font-size:.82rem}
+  table.guided td{font-size:.86rem}
+}
+.scn-desc{color:var(--muted);font-size:.9rem;margin:6px 0 0;}
 
 /* arms */
 .arms{display:grid;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));gap:12px;}
@@ -237,11 +281,19 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
   body{font-size:15px;}
   .two{grid-template-columns:1fr;}
   .wrap{padding:0 15px;}
-  header.hero{padding:26px 0 20px;}
+  header.hero{padding:18px 0 14px;}
   .card{padding:15px;}
-  section{margin-bottom:26px;}
+  section{margin-bottom:20px;}
   .summary{position:static;}
-  nav.jump{gap:4px;}
+  /* Pull the question selector and the first comparison up on a phone. The
+     banner above is required disclosure and is not touched; the budget comes
+     from the hero and the inter-section gaps, not from shrinking body text. */
+  .lab-opener{font-size:.95rem;margin-top:8px}
+  #s-scn h2{margin-bottom:2px}
+  .starters{margin:8px 0 4px}
+  .starters button{min-height:44px;padding:10px 12px}
+  .showme-h{margin:0 0 6px!important}
+  .guided-card{padding:14px 15px}
 }
 @media print{ .scn,.skip,nav.jump,#status{display:none;} body{background:#fff;}
   .card,.arm,.finding{box-shadow:none;break-inside:avoid;} details{display:block;}
@@ -274,30 +326,11 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
 <header class="hero">
   <div class="wrap">
     <p class="eyebrow" data-i18n="chrome.nav.lab">Simulation Lab</p>
-    <h1 data-i18n="lab.hero.h1">Revenue-Contingent Financing Under&nbsp;Volatile Sales</h1>
-    <p class="lede" data-i18n="lab.hero.lede">A model-based and simulation study motivated by Vietnamese
-      e-commerce sellers. The contribution is a deterministic, line-by-line-verifiable
-      comparison of fixed-payment and revenue-based financing — it needs no labels
-      and makes no prediction about who defaults.</p>
-    <div class="qbox">
-      <p data-i18n-html="lab.hero.question"><strong>Research question.</strong> When a seller's revenue falls, how does
-      the burden of a fixed instalment differ from a revenue share — and what does
-      that flexibility cost the financier in recovery speed?</p>
-    </div>
+    <h1 data-i18n="lab.hero.h1">Compare repayment when sales change</h1>
+    <p class="lab-opener" data-i18n="lab.hero.opener">Choose a simulated sales scenario and compare how four contracts respond. Simulation only — no observed seller outcomes exist in this project.</p>
   </div>
 </header>
 
-<div class="summary" id="summary" hidden>
-  <div class="wrap summary-in">
-    <p id="summary-text" aria-live="polite"></p>
-    <nav class="jump" aria-label="Jump to section" data-i18n-attr="aria-label:lab.jump.label">
-      <a href="#s-scn" data-i18n="lab.jump.scenario">Scenario</a><a href="#s-arms" data-i18n="lab.idx1.title">Contracts</a>
-      <a href="#s-burden" data-i18n="lab.jump.burden">Burden</a><a href="#s-recovery" data-i18n="lab.jump.recovery">Recovery</a>
-      <a href="#s-dur" data-i18n="lab.jump.settlement">Settlement</a><a href="#s-under" data-i18n="lab.jump.underreporting">Under-reporting</a>
-      <a href="#s-find" data-i18n="lab.jump.findings">Findings</a><a href="#s-limits" data-i18n="lab.jump.limitations">Limitations</a>
-    </nav>
-  </div>
-</div>
 
 <main id="main">
 <div class="wrap">
@@ -325,19 +358,63 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
   <div id="content" hidden>
 
   <section id="s-scn" aria-labelledby="h-scn">
-    <h2 id="h-scn" data-i18n="lab.jump.scenario">Scenario</h2>
-    <p class="lede" style="font-size:.92rem" data-i18n="lab.scn.lede">Each scenario is a family of 500 simulated
-      revenue paths sharing a shape. Choose one — every panel below updates together.</p>
-    <div id="scn-groups"></div>
+    <h2 id="h-scn" data-i18n="lab.scn.h2">Choose a simulated sales scenario</h2>
+    <p class="lede" style="font-size:.88rem;margin:4px 0 0" data-i18n="lab.scn.lede">Each is a family of 500 simulated revenue paths sharing a shape. Four starters below; all 13 remain available.</p>
+    <!-- Four STARTER choices, of the 13 available. The full set is one
+         disclosure away and every scenario stays reachable. -->
+    <div class="starters" id="starters" role="group" aria-label="Starter scenarios" data-i18n-attr="aria-label:lab.scn.startersLabel"></div>
+    <details class="all-scn" id="all-scn">
+      <summary><span data-i18n="lab.scn.allSummary">All 13 scenarios</span></summary>
+      <div id="scn-groups"></div>
+    </details>
     <p class="scn-desc" id="scn-desc"></p>
   </section>
 
+  <!-- ONE question selector. The result card and its chart both follow this
+       single selection; there is no second chart control anywhere. -->
+  <section id="s-guided" aria-labelledby="h-guided">
+    <h2 id="h-guided" class="showme-h" data-i18n="lab.guided.showMe">Show me</h2>
+    <div class="showme" id="showme" role="group" aria-label="Which question to answer" data-i18n-attr="aria-label:lab.guided.selectorLabel">
+      <button type="button" data-q="payments" aria-pressed="true" data-i18n="lab.guided.q.payments">Payments</button>
+      <button type="button" data-q="recovery" aria-pressed="false" data-i18n="lab.guided.q.recovery">Target recovery</button>
+      <button type="button" data-q="completion" aria-pressed="false" data-i18n="lab.guided.q.completion">Completion</button>
+    </div>
+    <div class="guided-card" id="guided-card">
+      <h3 id="guided-q"></h3>
+      <p class="guided-basis" id="guided-basis"></p>
+      <div class="guided-table" id="guided-table"></div>
+      <div class="warn" id="guided-caveat"></div>
+    </div>
+    <!-- The study's framing, moved out of the hero so the scenario selector and
+         the first result reach the opening viewport. Nothing is removed. -->
+<div class="summary" id="summary" hidden>
+  <div class="wrap summary-in">
+    <p id="summary-text" aria-live="polite"></p>
+  </div>
+</div>
+
+    <details class="panel about-study">
+      <summary><h3 data-i18n="lab.about.h3">About this study</h3></summary>
+      <p class="lede" data-i18n="lab.hero.lede">A model-based and simulation study motivated by Vietnamese
+        e-commerce sellers. The contribution is a deterministic, line-by-line-verifiable
+        comparison of fixed-payment and revenue-based financing — it needs no labels
+        and makes no prediction about who defaults.</p>
+      <div class="qbox">
+        <p data-i18n-html="lab.hero.question"><strong>Research question.</strong> When a seller's revenue falls, how does
+        the burden of a fixed instalment differ from a revenue share — and what does
+        that flexibility cost the financier in recovery speed?</p>
+      </div>
+    </details>
+  </section>
+
   <section id="s-arms" aria-labelledby="h-arms">
-    <h2 id="h-arms" data-i18n="lab.arms.h2">Contracts compared</h2>
-    <p class="lede" style="font-size:.92rem" data-i18n-html="lab.arms.lede">Four contracts on the same revenue paths.
-      The two revenue-based arms differ <em>only in price</em> — which is how a pricing
-      effect can be told from a structural one.</p>
-    <div class="arms" id="arms"></div>
+    <details class="panel">
+      <summary><h2 id="h-arms" data-i18n="lab.arms.h2">Contracts compared</h2></summary>
+      <p class="lede" style="font-size:.92rem" data-i18n-html="lab.arms.lede">Four contracts on the same revenue paths.
+        The two revenue-based arms differ <em>only in price</em> — which is how a pricing
+        effect can be told from a structural one.</p>
+      <div class="arms" id="arms"></div>
+    </details>
   </section>
 
   <div class="fx-switch" role="group" aria-label="Amount display" data-i18n-attr="aria-label:fx.display.label" style="margin:10px 0 4px"><button type="button" data-fx-option="vnd" aria-pressed="false" data-i18n="fx.display.vnd">VND only</button><span class="lang-sep" aria-hidden="true">/</span><button type="button" data-fx-option="dual" aria-pressed="true" data-i18n="fx.display.dual">VND + ≈ USD</button></div><p class="fx-note" data-fx-note aria-live="polite"></p>
@@ -345,13 +422,15 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
 
   <section id="s-burden" aria-labelledby="h-burden">
     <div class="card">
-      <h2 id="h-burden" data-i18n="lab.burden.h2">Seller payment burden</h2>
+      <details class="panel">
+      <summary><h2 id="h-burden" data-i18n="lab.burden.h2">Seller payment burden</h2></summary>
       <p style="color:var(--muted);font-size:.9rem;margin-bottom:12px" data-i18n="lab.burden.lede">Payment as a share of
         that month's revenue, summarised across simulated paths.</p>
       <div class="chart-wrap"><svg class="chart" id="chart-burden" role="img"
         aria-labelledby="burden-title"><title id="burden-title" data-i18n="lab.burden.chartTitle">Payment burden by contract</title></svg></div>
       <div class="warn" id="burden-caveat"></div>
       <details class="def"><summary data-i18n="lab.def.how">How this is measured</summary><p id="def-burden"></p></details>
+      </details>
     </div>
   </section>
 
@@ -371,19 +450,22 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
 
   <section id="s-recovery" aria-labelledby="h-recovery">
     <div class="card">
-      <h2 id="h-recovery" data-i18n="lab.recovery.h2">Provider recovery — the other side of the trade</h2>
+      <details class="panel">
+      <summary><h2 id="h-recovery" data-i18n="lab.recovery.h2">Provider recovery — the other side of the trade</h2></summary>
       <p style="color:var(--muted);font-size:.9rem;margin-bottom:12px" data-i18n="lab.recovery.lede">Share of each
         contract's own repayment target recovered by month 12, 18 and 24.</p>
       <div class="chart-wrap"><svg class="chart" id="chart-recovery" role="img"
         aria-labelledby="rec-title"><title id="rec-title" data-i18n="lab.recovery.chartTitle">Cumulative provider recovery by contract</title></svg></div>
       <div class="warn" id="rec-caveat"></div>
       <details class="def"><summary data-i18n="lab.def.how">How this is measured</summary><p id="def-recovery"></p></details>
+      </details>
     </div>
   </section>
 
   <section id="s-dur" aria-labelledby="h-dur">
     <div class="card">
-      <h2 id="h-dur" data-i18n="lab.dur.h2">Repayment duration and settlement</h2>
+      <details class="panel">
+      <summary><h2 id="h-dur" data-i18n="lab.dur.h2">Repayment duration and settlement</h2></summary>
       <div class="chart-wrap" id="dur-scroll"><div id="dur-table"></div></div>
       <p class="scrollnote" id="dur-scrollnote" data-i18n="lab.dur.scrollnote">↔ Scroll the table sideways to see every column.</p>
       <div class="warn" data-i18n-html="lab.dur.partialWarn">
@@ -393,6 +475,7 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
         duration therefore <em>overstates</em> the total.
       </div>
       <details class="def"><summary data-i18n="lab.def.howDuration">How duration is measured</summary><p id="def-dur"></p></details>
+      </details>
     </div>
   </section>
 
@@ -667,6 +750,9 @@ var FAMILY={
 };
 function familyLabel(f){ return FAMILY[f](); }
 function renderScenarios(list){
+  /* The starter row is painted from the same list, so it can never offer a
+     scenario the API does not serve. */
+  setTimeout(function(){ try { renderStarters(list); } catch(_) {} }, 0);
   STATE.scenarios=list;                // kept so a language switch can re-render
   var byFam={};
   list.forEach(function(s){(byFam[s.family]=byFam[s.family]||[]).push(s);});
@@ -684,8 +770,11 @@ function renderScenarios(list){
   });
 }
 function markSelected(key){
-  Array.prototype.forEach.call(document.querySelectorAll("#scn-groups button"),function(b){
-    b.setAttribute("aria-pressed", b.dataset.k===key?"true":"false");});
+  /* Both groups, so the starter row and the full list can never disagree
+     about which scenario is currently rendered. */
+  Array.prototype.forEach.call(
+    document.querySelectorAll("#scn-groups button, #starters button"), function(b){
+      b.setAttribute("aria-pressed", b.dataset.k===key?"true":"false");});
 }
 
 /* ── arms ───────────────────────────────────────────────────── */
@@ -1067,6 +1156,104 @@ function renderSummary(s,label){
   el("summary-text").innerHTML='<b>'+esc(apiText(s,"scenario_label")||label)+'.</b> '+esc(apiText(s,"sentence"));
 }
 
+/* ── the guided layer ───────────────────────────────────────────────────────
+   Four starter scenarios, one question selector, one result card. Every figure
+   here is read from the API response already in STATE -- nothing is recomputed
+   in JavaScript and no new request is made. Each row names its CONTRACT (by
+   descriptive name, with the id as a secondary reference), each column names
+   its STATISTIC, and the card states the UNIT, the DENOMINATOR and the HORIZON
+   before any number. */
+
+var STARTERS = ["stable", "sustained_decline", "temp_closure", "closure_m13"];
+var QUESTION = "payments";
+
+function renderStarters(list){
+  var byKey = {};
+  list.forEach(function(sc){ byKey[sc.key] = sc; });
+  el("starters").innerHTML = STARTERS.filter(function(k){ return byKey[k]; })
+    .map(function(k){
+      return '<button type="button" data-k="'+esc(k)+'" aria-pressed="false">'+
+             esc(apiText(byKey[k],'label'))+'</button>';
+    }).join("");
+  Array.prototype.forEach.call(el("starters").querySelectorAll("button"), function(b){
+    b.addEventListener("click", function(){ select(b.dataset.k); });
+  });
+  markSelected(STATE.scenario);
+}
+
+/* The three questions. `rows` returns [{label, id, cells:[...]}, ...] and every
+   value is formatted by the same pct()/num() helpers the rest of the page uses,
+   from the same API fields -- so a figure here cannot disagree with the panel
+   it summarises. */
+var QUESTIONS = {
+  payments: {
+    titleKey: "lab.guided.payments.title",
+    titleEn: "What share of sales goes to payments?",
+    basisKey: "lab.guided.payments.basis",
+    basisEn: "Payment \u00f7 GMV in a month, as a percentage. Summary statistics over the 24-month observation window \u2014 there is no monthly series behind these figures.",
+    cols: function(){ return [
+      t('lab.guided.col.mean',"Mean month"),
+      t('lab.guided.col.p90',"90th percentile"),
+      t('lab.guided.col.peak',"Peak month")
+    ]; },
+    cells: function(a){ return [pct(a.burden.mean,2), pct(a.burden.p90,2), pct(a.burden.max,2)]; },
+    caveat: function(d){ return apiText(d.metric_definitions.burden,'caveat'); }
+  },
+  recovery: {
+    titleKey: "lab.guided.recovery.title",
+    titleEn: "How much of each repayment target is recovered?",
+    basisKey: "lab.guided.recovery.basis",
+    basisEn: "Recorded checkpoints at months 12, 18 and 24 \u2014 not a monthly series. Each contract is measured against its OWN repayment target, and the targets differ.",
+    cols: function(){ return ["12","18","24"].map(function(m){
+      return t('lab.guided.col.byMonth',"By month {m}",{m:m}); }); },
+    cells: function(a){ return ["12","18","24"].map(function(m){
+      return a.recovery_ratio && a.recovery_ratio[m]!=null ? pct(a.recovery_ratio[m],1) : "\u2014"; }); },
+    note: function(a){ return apiText(a,'recovery_denominator'); },
+    caveat: function(d){ return apiText(d.metric_definitions.recovery_ratio,'caveat'); }
+  },
+  completion: {
+    titleKey: "lab.guided.completion.title",
+    titleEn: "How many paths complete repayment within 24 months?",
+    basisKey: "lab.guided.completion.basis",
+    basisEn: "Share of the simulated revenue paths for this scenario that reach the repayment target inside the fixed 24-month observation window.",
+    cols: function(){ return [t('lab.guided.col.completed',"Completed within 24 months")]; },
+    cells: function(a){ return [pct(a.completed_share,1)]; },
+    caveat: function(d){ return apiText(d.metric_definitions.incomplete_recovery_rate,'caveat'); }
+  }
+};
+
+function renderGuided(){
+  var d = STATE.data; if(!d) return;
+  var q = QUESTIONS[QUESTION] || QUESTIONS.payments;
+  el("guided-q").textContent = t(q.titleKey, q.titleEn);
+  el("guided-basis").textContent = t(q.basisKey, q.basisEn);
+
+  var cols = q.cols();
+  var head = '<tr><th>'+esc(t('lab.dur.col.contract',"Contract"))+'</th>'+
+             cols.map(function(c){ return '<th>'+esc(c)+'</th>'; }).join("")+'</tr>';
+  var body = d.arms.map(function(a){
+    var note = q.note ? q.note(a) : "";
+    return '<tr><th scope="row"><span class="arm-name">'+esc(apiText(a,'name'))+'</span>'+
+           '<span class="arm-id">'+esc(a.id)+'</span>'+
+           (note ? '<span class="arm-note">'+esc(note)+'</span>' : '')+'</th>'+
+           q.cells(a).map(function(v){ return '<td class="mono">'+esc(v)+'</td>'; }).join("")+
+           '</tr>';
+  }).join("");
+  el("guided-table").innerHTML = '<table class="data guided">'+
+    '<thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
+  el("guided-caveat").textContent = q.caveat(d);
+
+  Array.prototype.forEach.call(el("showme").querySelectorAll("button"), function(b){
+    b.setAttribute("aria-pressed", String(b.dataset.q === QUESTION));
+  });
+}
+
+function selectQuestion(key){
+  if(!QUESTIONS[key]) return;
+  QUESTION = key;
+  renderGuided();
+}
+
 /* ── orchestration ──────────────────────────────────────────── */
 /* Scenario selection is ATOMIC. Every request carries a monotonically
    increasing token; a response whose token is no longer current is discarded
@@ -1099,6 +1286,7 @@ async function select(key){
     renderArms(d.arms); renderLegend(d.arms);
     renderDuration(d.arms); renderDefs(d.metric_definitions);
     renderFindings(d.findings); renderPanels(d);
+    renderGuided();
     drawCharts();
     setBusy(false);
     return true;
@@ -1124,11 +1312,54 @@ function applyFolds(){
   });
 }
 /* A chart inside a closed <details> has zero width, so it must be drawn when
-   the panel opens, not before. */
+   the panel opens, not before. This now covers the optional detail panels as
+   well as the narrow folds -- #chart-burden and #chart-recovery both live in a
+   .panel that ships closed. */
 document.addEventListener("toggle",function(e){
   var d=e.target;
-  if(d.open && d.matches && d.matches('[data-fold="narrow"]')) drawCharts();
+  if(d.open && d.matches && d.matches('[data-fold="narrow"], .panel')) drawCharts();
 },true);
+
+/* ── deep links ─────────────────────────────────────────────────────────────
+   Every anchor this page has ever published still resolves. Because the detail
+   sections are now optional panels, a deep link must OPEN the panel before
+   scrolling to it -- landing on a collapsed element would look like a dead
+   link. Two of them also drive the question selector, because that is where
+   their content now primarily lives:
+
+     #s-burden    -> selects "Payments",        opens the burden panel
+     #s-recovery  -> selects "Target recovery", opens the recovery panel
+     #s-dur       -> selects "Completion",      opens the settlement panel
+     #s-arms, #s-hpb, #s-under, #s-find, #s-limits, #s-prov -> open that panel
+     #s-scn, #s-guided -> scroll only; they are not panels
+
+   Handled on first load AND on hashchange/popstate, because the first load
+   fires no hashchange -- the demo page's one-shot router had exactly that
+   bug. */
+var ANCHOR_QUESTION = {"s-burden":"payments", "s-recovery":"recovery", "s-dur":"completion"};
+
+function routeToAnchor(){
+  var id=(location.hash||"").slice(1);
+  if(!id) return;
+  var target=document.getElementById(id);
+  if(!target) return;
+  if(ANCHOR_QUESTION[id]) selectQuestion(ANCHOR_QUESTION[id]);
+  /* Open every collapsed ancestor, not just the nearest one. */
+  var node=target;
+  while(node && node!==document.body){
+    if(node.tagName==="DETAILS" && !node.open) node.open=true;
+    node=node.parentElement;
+  }
+  Array.prototype.forEach.call(target.querySelectorAll("details.panel, details.fold"),function(d){
+    d.open=true;
+  });
+  drawCharts();                      // the panel has width now
+  target.scrollIntoView({block:"start"});
+  if(!target.hasAttribute("tabindex")) target.setAttribute("tabindex","-1");
+  target.focus({preventScroll:true});
+}
+window.addEventListener("hashchange", routeToAnchor);
+window.addEventListener("popstate", routeToAnchor);
 
 var _rt=null;
 window.addEventListener("resize",function(){clearTimeout(_rt);_rt=setTimeout(function(){
@@ -1136,6 +1367,11 @@ window.addEventListener("resize",function(){clearTimeout(_rt);_rt=setTimeout(fun
 
 async function init(){
   show("loading");
+  /* The question selector is static markup, so it is bound once here. It only
+     re-renders the card from data already in STATE -- it never refetches. */
+  Array.prototype.forEach.call(el("showme").querySelectorAll("button"), function(b){
+    b.addEventListener("click", function(){ selectQuestion(b.dataset.q); });
+  });
   try{
     var m=await getJSON("/api/lab/manifest");
     STATE.manifest=m; renderProvenance(m);
@@ -1154,6 +1390,7 @@ async function init(){
     show("ready");
     applyFolds();
     drawCharts();                   // charts need a laid-out, visible container
+    routeToAnchor();                // a deep link must open its panel, not land on a shut one
   }catch(e){
     if(e && e.publicSafe && e.status===503){show("unavailable");}
     else{show("error", publicMessage(e), publicKey(e));}
@@ -1192,6 +1429,7 @@ window.addEventListener("rbf:languagechange",function(){
     el("scn-desc").textContent = apiText(STATE.data.scenario,"description");
     renderSummary(STATE.data.summary, STATE.data.scenario.label);
     renderPanels(STATE.data);
+    renderGuided();
     drawCharts();
   }
   if(STATE.under!==null) renderUnderreporting(STATE.under);

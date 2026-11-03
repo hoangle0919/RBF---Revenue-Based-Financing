@@ -336,3 +336,101 @@ def test_the_recovery_finding_handles_a_tie_too():
     assert 'direction = "ahead of" if f12 >= r12 else "behind"' not in src, (
         ">= reports a tie as 'ahead of'"
     )
+
+
+# ── the guided layer ───────────────────────────────────────────────────────
+
+LAB_SRC = (ROOT / "frontend" / "lab.html").read_text(encoding="utf-8")
+
+
+def test_one_question_selector_drives_both_the_card_and_the_chart():
+    """Not three competing controls.
+
+    The review asked for a single synchronised selection rather than question
+    cards plus a separate chart selector plus mobile tabs. There is exactly one
+    `#showme` group, and the mobile layout wraps it rather than duplicating it.
+    """
+    assert LAB_SRC.count('id="showme"') == 1
+    assert LAB_SRC.count('data-q="payments"') == 1
+    assert LAB_SRC.count('data-q="recovery"') == 1
+    assert LAB_SRC.count('data-q="completion"') == 1
+    # descriptive labels, not Q numbers
+    for key in ("lab.guided.q.payments", "lab.guided.q.recovery",
+                "lab.guided.q.completion"):
+        for lang, cat in (("en", EN), ("vi", VI)):
+            assert cat.get(key, "").strip(), f"{lang} missing {key}"
+    assert not re.search(r">\s*Q[123]\s*<", LAB_SRC), "Q numbers are not descriptive labels"
+
+
+def test_the_guided_layer_claims_no_time_series():
+    """Burden is summary statistics and recovery is recorded checkpoints.
+
+    The API exposes no monthly series for either, so no label may imply one.
+    """
+    assert "over time" not in LAB_SRC.lower()
+    for lang, cat in (("en", EN), ("vi", VI)):
+        basis = cat["lab.guided.payments.basis"]
+        assert ("no monthly series" in basis
+                or "không có chuỗi số liệu theo từng tháng" in basis), lang
+        rec = cat["lab.guided.recovery.basis"]
+        assert ("checkpoints" in rec or "mốc được ghi nhận" in rec), lang
+
+
+def test_every_guided_figure_names_its_contract_and_its_statistic():
+    """Each row names a contract, each column a statistic, with the id kept as
+    a secondary reference rather than as the label."""
+    assert "apiText(a,'name')" in LAB_SRC, "rows must use the descriptive name"
+    assert "'<span class=\"arm-id\">'+esc(a.id)" in LAB_SRC, "id stays secondary"
+    for key in ("lab.guided.col.mean", "lab.guided.col.p90", "lab.guided.col.peak",
+                "lab.guided.col.byMonth", "lab.guided.col.completed"):
+        for lang, cat in (("en", EN), ("vi", VI)):
+            assert cat.get(key, "").strip(), f"{lang} missing {key}"
+
+
+def test_the_recovery_question_shows_each_arms_own_denominator():
+    """Targets differ by arm, so a share is not an amount."""
+    assert "q.note(a)" in LAB_SRC and "recovery_denominator" in LAB_SRC
+    for scenario in SCENARIOS:
+        arms = client.get(f"/api/lab/comparison/{scenario}").json()["arms"]
+        for a in arms:
+            assert a.get("recovery_denominator"), f"{scenario}/{a['id']}"
+
+
+def test_four_starters_are_offered_and_all_thirteen_stay_reachable():
+    assert 'id="starters"' in LAB_SRC
+    assert 'id="all-scn"' in LAB_SRC and 'id="scn-groups"' in LAB_SRC
+    m = re.search(r"var STARTERS = \[(.*?)\]", LAB_SRC, re.S)
+    assert m, "starter list"
+    starters = re.findall(r'"([^"]+)"', m.group(1))
+    assert len(starters) == 4, starters
+    for key in starters:
+        assert key in SCENARIOS, f"{key} is not a served scenario"
+    assert "temp_closure" in starters and "closure_m13" in starters, (
+        "temporary interruption and permanent closure must stay distinct")
+    for lang, cat in (("en", EN), ("vi", VI)):
+        assert "13" in cat["lab.scn.allSummary"], lang
+
+
+def test_every_published_anchor_still_resolves_and_opens_its_panel():
+    """A deep link must OPEN the panel, not land on a collapsed element."""
+    for anchor in ("s-scn", "s-guided", "s-arms", "s-burden", "s-hpb",
+                   "s-recovery", "s-dur", "s-under", "s-find", "s-limits", "s-prov"):
+        assert f'id="{anchor}"' in LAB_SRC, anchor
+    assert "function routeToAnchor()" in LAB_SRC
+    assert 'window.addEventListener("hashchange", routeToAnchor)' in LAB_SRC
+    assert 'window.addEventListener("popstate", routeToAnchor)' in LAB_SRC
+    assert "routeToAnchor();" in LAB_SRC, "first load fires no hashchange"
+    assert 'node.tagName==="DETAILS" && !node.open' in LAB_SRC
+    for anchor, question in (("s-burden", "payments"), ("s-recovery", "recovery"),
+                             ("s-dur", "completion")):
+        assert f'"{anchor}":"{question}"' in LAB_SRC.replace(" ", ""), anchor
+
+
+def test_a_chart_in_a_closed_panel_is_drawn_when_the_panel_opens():
+    """A chart inside a shut <details> has zero width."""
+    assert """d.matches('[data-fold="narrow"], .panel')""" in LAB_SRC
+
+
+def test_the_eight_label_jump_bar_is_gone():
+    """It was the default visitor journey the redesign replaces."""
+    assert 'class="jump"' not in LAB_SRC
