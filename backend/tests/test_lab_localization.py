@@ -616,3 +616,130 @@ def test_stacked_guided_labels_override_inherited_nowrap():
     assert "white-space:normal" in cell
     assert "white-space:normal" in label
     assert "overflow-wrap:anywhere" in label
+
+
+# ── the redesigned reading experience ──────────────────────────────────────
+
+def test_the_primary_comparison_is_the_named_pair_not_all_four():
+    """One compact fixed-versus-revenue-share comparison, stated explicitly.
+
+    The audit's useful/understandable failure was four stacked multi-statistic
+    cards as the entry comparison. The entry is now two aligned marks, and the
+    page says in words which two it is showing and why.
+    """
+    assert 'var PAIR = ["FIX-A", "RBF-ILL"];' in LAB_SRC
+    assert 'id="pair"' in LAB_SRC and "function markRow(" in LAB_SRC
+    for lang, cat in (("en", EN), ("vi", VI)):
+        scope = cat["lab.pair.scope"]
+        assert "{a}" in scope and "{b}" in scope and "{n}" in scope, lang
+        # the selection is explained, not merely stated
+        assert ("prices against each other" in scope
+                or "định giá đối chiếu" in scope), lang
+
+
+def test_the_answer_comes_before_the_methodology():
+    """E1: a 102-word methodology paragraph preceded any number.
+
+    The comparison now carries a ONE-LINE basis; the full paragraph lives in
+    the single secondary area, behind a disclosure.
+    """
+    compare = LAB_SRC.split('<div class="compare" id="compare">', 1)[1].split("</div>", 1)[0]
+    assert 'id="guided-basis"' in compare
+    detail = LAB_SRC.split('id="s-detail"', 1)[1].split("</details>", 1)[0]
+    assert 'id="guided-basis-full"' in detail, "the long basis belongs in the detail area"
+    for lang, cat in (("en", EN), ("vi", VI)):
+        brief = cat["lab.guided.payments.brief"]
+        full = cat["lab.guided.payments.basis"]
+        # Character length, not word count: Vietnamese separates syllables, so
+        # a word cap is not comparable across the two catalogues.
+        assert len(brief) <= 130, f"{lang} brief basis is {len(brief)} chars"
+        assert len(full) > 4 * len(brief), (
+            f"{lang}: the detail basis should be substantially fuller "
+            f"({len(full)} vs {len(brief)} chars)")
+
+
+def test_each_mark_states_what_kind_of_figure_it_is():
+    """FIX-A is a scheduled-payment benchmark, not observed collections, and
+    that has to sit beside the number rather than only in the methods panel."""
+    assert "lab.mark.note.fixed" in LAB_SRC and "lab.mark.note.rbf" in LAB_SRC
+    # and it must actually be RENDERED into the mark, not merely defined
+    mark = LAB_SRC.split("function markRow(", 1)[1].split("\n}", 1)[0]
+    assert "mark-note" in mark, "the qualifier must be rendered beside the value"
+    assert "lab.mark.note." in mark
+    for lang, cat in (("en", EN), ("vi", VI)):
+        fixed = cat["lab.mark.note.fixed"].lower()
+        assert ("benchmark" in fixed or "mốc so sánh" in fixed), lang
+        assert ("not observed" in fixed or "không phải số liệu thu hồi quan sát" in fixed), lang
+
+
+def test_the_takeaway_is_scenario_scoped_and_never_a_universal_winner():
+    """One short, scenario-dependent takeaway beside the result."""
+    assert "function renderTakeaway(" in LAB_SRC
+    assert 'id="takeaway-text"' in LAB_SRC
+    for lang, cat in (("en", EN), ("vi", VI)):
+        # payments must carry the non-affordability qualification
+        for key in ("lab.take.payments.lower", "lab.take.payments.equal"):
+            txt = cat[key].lower()
+            assert ("affordability" in txt or "khả năng chi trả" in txt), f"{lang}/{key}"
+        # recovery must say the direction depends on the path
+        for key in ("lab.take.recovery.ahead", "lab.take.recovery.level"):
+            txt = cat[key].lower()
+            assert ("depends on the revenue path" in txt
+                    or "tùy thuộc vào đường doanh thu" in txt), f"{lang}/{key}"
+        # completion must not read as a default prediction
+        for key in ("lab.take.completion.more", "lab.take.completion.equal"):
+            txt = cat[key].lower()
+            assert ("not a predicted default" in txt
+                    or "không phải một dự báo vỡ nợ" in txt), f"{lang}/{key}"
+    low = LAB_SRC.lower()
+    for banned in ("rbf is better", "revenue share wins", "always cheaper"):
+        assert banned not in low, banned
+
+
+def test_the_payments_headline_is_the_mean_of_path_peaks_not_a_global_peak():
+    """`burden_max` is the average of each path's own worst month."""
+    pay = LAB_SRC.split("payments: {", 1)[1].split("recovery: {", 1)[0]
+    assert "a.burden.max" in pay
+    for lang, cat in (("en", EN), ("vi", VI)):
+        brief = cat["lab.guided.payments.brief"].lower()
+        assert ("average of each path" in brief or "trung bình tháng cao nhất của từng đường" in brief), lang
+        assert ("gmv" in brief), lang
+        assert ("active months" in brief or "tháng có hoạt động" in brief), lang
+
+
+def test_recovery_and_completion_state_their_horizon_and_denominator():
+    for lang, cat in (("en", EN), ("vi", VI)):
+        rec = cat["lab.guided.recovery.brief"].lower()
+        assert ("month 12" in rec or "tháng 12" in rec), lang
+        assert ("own repayment target" in rec or "mục tiêu hoàn trả của chính" in rec), lang
+        comp = cat["lab.guided.completion.brief"].lower()
+        assert ("24-month" in comp or "24 tháng" in comp), lang
+        assert ("500" in comp), lang
+
+
+def test_the_undefined_rate_reason_uses_its_translation_key():
+    """E5: apr() read the raw English field although a key was available.
+
+    No registered scenario currently produces an undefined rate, so this is a
+    latent path; it is pinned here rather than left for an artifact that
+    produces one.
+    """
+    assert "apiText(a,'apr_undefined_reason')" in LAB_SRC
+    assert "a.apr_undefined_reason ||" not in LAB_SRC
+    for lang, cat in (("en", EN), ("vi", VI)):
+        assert cat.get("labpage.arm.aprUndefined", "").strip(), lang
+
+
+def test_findings_are_collapsed_while_limitations_stay_open():
+    """The asymmetry must point this way, never the other.
+
+    Collapsing the limitations alongside the findings would make the
+    qualifying side as hidden as the favourable side.
+    """
+    find = LAB_SRC.split('id="s-find"', 1)[1].split("</section>", 1)[0]
+    assert 'details class="panel"' in find, "findings should be a disclosure"
+    limits = LAB_SRC.split('id="s-limits"', 1)[1].split("</section>", 1)[0]
+    before = limits.split('id="caveats"', 1)[0]
+    assert before.count("<details") - before.count("</details>") == 0, (
+        "limitations must not be collapsed"
+    )

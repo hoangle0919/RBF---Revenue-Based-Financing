@@ -574,18 +574,20 @@ def test_inline_javascript_stays_small():
     """Measured, not estimated. A budget that fails loudly if the page grows a
     framework by accident.
 
-    Raised from 40,000 to 52,000 B for the guided layer: four starter
-    scenarios, one question selector, one result card, and deep-link routing
-    that opens a panel before scrolling to it. Measured after that work:
-    47,710 B, so the headroom is about 4 kB.
+    History: 40,000 -> 52,000 for the guided layer, then -> 58,000 for the
+    reading-experience redesign, which added the paired comparison, the
+    comparison marks and the scenario-dependent takeaway. Measured after that
+    work: 55,431 B, leaving about 2.5 kB.
 
-    The budget's purpose is unchanged. Any real framework costs hundreds of
-    kilobytes, so 52 kB still fails loudly on one, and the headroom is small
-    enough that unexplained growth fails too.
+    The budget is a scoped, measured ceiling on THIS file, not a claim that a
+    larger number would be slow: review has noted that extracting the script
+    solely to satisfy a file-local budget would not reduce shipped bytes. Its
+    job is to make unexplained growth fail loudly, which a ~2.5 kB headroom
+    does.
     """
     html = open(LAB_HTML, encoding="utf-8").read()
     js = html.split("<script>", 1)[1].rsplit("</script>", 1)[0]
-    assert len(js.encode()) < 52_000, f"inline JS is {len(js.encode()):,} B"
+    assert len(js.encode()) < 58_000, f"inline JS is {len(js.encode()):,} B"
 
 
 # Principle 5 (unobtrusive) — scored 3, must not regress.

@@ -56,7 +56,7 @@ p{margin:0 0 1em;}
 .banner .wrap{display:flex;gap:10px;align-items:flex-start;}
 .banner strong{color:#fff;}
 
-header.hero{background:var(--surface);border-bottom:1px solid var(--hairline);padding:26px 0 20px;}
+header.hero{background:var(--surface);border-bottom:1px solid var(--hairline);padding:15px 0 13px;}
 .eyebrow{font-size:.72rem;text-transform:uppercase;letter-spacing:.13em;color:var(--faint);
   font-weight:700;margin-bottom:10px;}
 .lede{font-size:clamp(.98rem,2vw,1.1rem);color:var(--muted);max-width:64ch;}
@@ -93,7 +93,50 @@ section{margin-bottom:26px;scroll-margin-top:96px;}
 .scn button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 .about-study{margin-top:16px}
 .about-study>summary h3{margin:0!important;display:inline;font-size:.95rem}
-.lab-opener{margin:10px 0 0;font-size:1rem;line-height:1.6;max-width:62ch;color:var(--ink)}
+.lab-opener{margin:8px 0 0;font-size:1rem;line-height:1.6;max-width:62ch;color:var(--ink)}
+/* ── the primary comparison ────────────────────────────────────────────────
+   Two aligned marks, not four nested cards. One spacing step (8px) and three
+   type sizes, so the ANSWER is the visual foreground and the supporting label
+   recedes behind it -- the inversion the audit scored 0 on understandable. */
+.compare{border:1px solid var(--line);background:#fff;padding:13px 18px}
+.compare-scn{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin:0 0 8px;
+  padding-bottom:8px;border-bottom:1px solid var(--line)}
+.compare-scn-label{font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+#compare-scn{font-size:.9rem;font-weight:600}
+.compare h3{margin:0 0 4px;font-size:1.06rem;line-height:1.35;font-weight:600}
+.compare-basis{margin:0 0 13px;font-size:.8rem;line-height:1.5;color:var(--muted)}
+.pair{display:grid;gap:12px}
+.mark-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:5px}
+.mark-name{font-size:.92rem;font-weight:600;line-height:1.3}
+.mark-id{font-size:.68rem;letter-spacing:.07em;color:var(--muted);font-family:var(--mono,monospace)}
+.mark-note{margin:6px 0 0;font-size:.74rem;line-height:1.45;color:var(--muted);max-width:52ch}
+.mark-row{display:flex;align-items:center;gap:12px}
+/* The bar is a length-encoded value on a common scale, with the number printed
+   beside it. aria-hidden, because the value itself is the accessible content. */
+.mark-bar{flex:1 1 auto;min-width:0;height:12px;background:#e8e4db;position:relative;display:block}
+.mark-bar>i{display:block;height:100%;background:var(--ink)}
+.mark-rbf .mark-bar>i{background:#7a5c2e}
+.mark-val{flex:0 0 auto;font-size:1.5rem;font-weight:600;line-height:1;letter-spacing:-.01em;
+  font-variant-numeric:tabular-nums;min-width:4.6ch;text-align:right}
+.takeaway{margin-top:18px;border-left:3px solid var(--ochre,#d7b477);padding:2px 0 2px 12px}
+.takeaway-label{display:block;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:4px}
+.takeaway p{margin:0;font-size:.92rem;line-height:1.55}
+.pair-scope{margin:16px 0 0;font-size:.78rem;line-height:1.5;color:var(--muted)}
+.detail-area{margin-top:14px}
+.detail-area>summary h3{margin:0!important;display:inline;font-size:.92rem}
+
+/* Desktop: scenario column beside the comparison, one horizontal workspace
+   rather than a stack of dashboards. */
+@media (min-width:900px){
+  .lab-work{display:grid;grid-template-columns:minmax(220px,264px) 1fr;gap:32px;align-items:start}
+  .lab-work #s-scn{margin-bottom:0}
+}
+@media (max-width:560px){
+  .compare{padding:14px 15px}
+  .mark-val{font-size:1.3rem}
+  .mark-row{gap:10px}
+}
 /* R1: the guided table carried table.data's min-width:760px into a 313px
    phone viewport, so overflow-x:auto hid the actual answers behind a sideways
    scroll -- a page-width overflow check passes while the core task fails.
@@ -150,7 +193,7 @@ section{margin-bottom:26px;scroll-margin-top:96px;}
 .all-scn>summary{cursor:pointer;font-size:.86rem;color:var(--muted);min-height:44px;display:inline-flex;align-items:center}
 .all-scn>summary:hover{color:var(--ink)}
 .showme-h{font-size:.74rem!important;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 8px!important}
-.showme{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.showme{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .showme button{font:inherit;font-size:.92rem;padding:12px 18px;min-height:44px;cursor:pointer;
   background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:2px}
 .showme button:hover{border-color:var(--ink)}
@@ -325,8 +368,12 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
   /* Pull the question selector and the first comparison up on a phone. The
      banner above is required disclosure and is not touched; the budget comes
      from the hero and the inter-section gaps, not from shrinking body text. */
-  .lab-opener{font-size:.95rem;margin-top:8px}
-  #s-scn h2{margin-bottom:2px}
+  .lab-opener{font-size:.95rem;margin-top:6px}
+  .lab-shell header.hero h1{font-size:1.5rem;line-height:1.25}
+  #s-scn h2{margin-bottom:2px;font-size:1.05rem}
+  /* The scenario lede explains the family of paths; the heading already says
+     what to do, and the comparison now names the chosen scenario itself. */
+  #s-scn>.lede{display:none}
   .starters{margin:8px 0 4px}
   .starters button{min-height:44px;padding:10px 12px}
   .showme-h{margin:0 0 6px!important}
@@ -364,7 +411,7 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
   <div class="wrap">
     <p class="eyebrow" data-i18n="chrome.nav.lab">Simulation Lab</p>
     <h1 data-i18n="lab.hero.h1">Compare repayment when sales change</h1>
-    <p class="lab-opener" data-i18n="lab.hero.opener">Choose a simulated sales scenario and compare how four contracts respond. Simulation only — no observed seller outcomes exist in this project.</p>
+    <p class="lab-opener" data-i18n="lab.hero.opener">Pick a sales scenario and see what a fixed payment and a revenue share do. Simulation only — no observed seller outcomes exist in this project.</p>
   </div>
 </header>
 
@@ -394,6 +441,11 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
 
   <div id="content" hidden>
 
+  <!-- One horizontal workspace on desktop: scenario controls in a narrow
+       column, the comparison in the main area. On a phone it is a single
+       column, scenario then comparison. -->
+  <div class="lab-work">
+
   <section id="s-scn" aria-labelledby="h-scn">
     <h2 id="h-scn" data-i18n="lab.scn.h2">Choose a simulated sales scenario</h2>
     <p class="lede" style="font-size:.88rem;margin:4px 0 0" data-i18n="lab.scn.lede">Each is a family of 500 simulated revenue paths sharing a shape. Four starters below; all 13 remain available.</p>
@@ -407,28 +459,46 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
     <p class="scn-desc" id="scn-desc"></p>
   </section>
 
-  <!-- ONE question selector. The result card and its chart both follow this
-       single selection; there is no second chart control anywhere. -->
+  <!-- ONE question selector, driving ONE comparison. The selector changes the
+       comparison only; the detail charts live in their own panels and are drawn
+       when a panel opens. -->
   <section id="s-guided" aria-labelledby="h-guided">
     <h2 id="h-guided" class="showme-h" data-i18n="lab.guided.showMe">Show me</h2>
     <div class="showme" id="showme" role="group" aria-label="Which question to answer" data-i18n-attr="aria-label:lab.guided.selectorLabel">
-      <button type="button" data-q="payments" aria-pressed="true" data-i18n="lab.guided.q.payments">Payments</button>
+      <button type="button" data-q="payments" aria-pressed="true" data-i18n="lab.guided.q.payments">Payment share</button>
       <button type="button" data-q="recovery" aria-pressed="false" data-i18n="lab.guided.q.recovery">Target recovery</button>
       <button type="button" data-q="completion" aria-pressed="false" data-i18n="lab.guided.q.completion">Completion</button>
     </div>
-    <div class="guided-card" id="guided-card">
+
+    <!-- THE ANSWER COMES FIRST. One short statement of what is being measured,
+         one line of basis, then the two values. The full methodology is in the
+         single secondary area below, not ahead of the result. -->
+    <div class="compare" id="compare">
+      <p class="compare-scn"><span class="compare-scn-label" data-i18n="lab.compare.scnLabel">Sales scenario</span><span id="compare-scn"></span></p>
       <h3 id="guided-q"></h3>
-      <p class="guided-basis" id="guided-basis"></p>
+      <p class="compare-basis" id="guided-basis"></p>
+      <div class="pair" id="pair"></div>
+      <div class="takeaway" id="takeaway" aria-live="polite">
+        <span class="takeaway-label" data-i18n="lab.takeaway.label">In this scenario</span>
+        <p id="takeaway-text"></p>
+      </div>
+      <p class="pair-scope" id="pair-scope"></p>
+    </div>
+
+    <details class="panel detail-area" id="s-detail">
+      <summary><h3 data-i18n="lab.detail.h3">All four contracts, detailed statistics and methods</h3></summary>
       <div class="guided-table" id="guided-table"></div>
       <div class="warn" id="guided-caveat"></div>
-    </div>
-    <!-- The study's framing, moved out of the hero so the scenario selector and
-         the first result reach the opening viewport. Nothing is removed. -->
-<div class="summary" id="summary" hidden>
-  <div class="wrap summary-in">
-    <p id="summary-text" aria-live="polite"></p>
-  </div>
-</div>
+      <details class="def"><summary data-i18n="lab.detail.basis">How this figure is measured</summary><p id="guided-basis-full"></p></details>
+      <!-- The longer FIX-A / RBF-ILL sentence. It says the same thing as the
+           takeaway above at more length, so it belongs with the detail rather
+           than competing with the answer. Still rendered, still translated. -->
+      <div class="summary" id="summary" hidden>
+        <div class="summary-in">
+          <p id="summary-text" aria-live="polite"></p>
+        </div>
+      </div>
+    </details>
 
     <details class="panel about-study">
       <summary><h3 data-i18n="lab.about.h3">About this study</h3></summary>
@@ -443,6 +513,7 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
       </div>
     </details>
   </section>
+  </div><!-- /.lab-work -->
 
   <section id="s-arms" aria-labelledby="h-arms">
     <details class="panel">
@@ -527,15 +598,27 @@ footer{border-top:1px solid var(--hairline);background:var(--surface);padding:22
     </div>
   </section>
 
+  <!-- Extended explanation, one disclosure away. The ESSENTIAL qualifications
+       -- what each figure measures, its denominator, its horizon, and what it
+       does not establish -- now sit beside the figures in the comparison, so
+       this is elaboration rather than a precondition for reading the answer.
+       Nothing is removed and the anchor still opens it. -->
   <section id="s-find" aria-labelledby="h-find">
-    <h2 id="h-find" data-i18n="lab.find.h2">What this shows — and what kind of claim each statement is</h2>
-    <p class="lede" style="font-size:.92rem" data-i18n="lab.find.lede">A proof and a simulation output are not the
-      same kind of evidence. Every statement is labelled with which it is, and every
-      scenario-dependent statement names its scenario.</p>
-    <div id="findings"></div>
-    <details class="def"><summary data-i18n="lab.find.taxonomy">What the labels mean</summary><div id="taxonomy"></div></details>
+    <details class="panel">
+      <summary><h2 id="h-find" data-i18n="lab.find.h2">What this shows — and what kind of claim each statement is</h2></summary>
+      <p class="lede" style="font-size:.92rem" data-i18n="lab.find.lede">A proof and a simulation output are not the
+        same kind of evidence. Every statement is labelled with which it is, and every
+        scenario-dependent statement names its scenario.</p>
+      <div id="findings"></div>
+      <details class="def"><summary data-i18n="lab.find.taxonomy">What the labels mean</summary><div id="taxonomy"></div></details>
+    </details>
   </section>
 
+  <!-- NOT collapsed, deliberately. `s-find` above is a disclosure because it
+       carries the findings; collapsing the limitations alongside them would
+       make the favourable side as hidden as the qualifying side, and the
+       repository guards against the reverse asymmetry explicitly. Limitations
+       stay open. -->
   <section id="s-limits" class="two">
     <div class="card">
       <h2 data-i18n="lab.limits.assumptions">Assumptions</h2>
@@ -628,10 +711,13 @@ function pct(x,dp){return (x==null)?"—":(x*100).toFixed(dp==null?1:dp)+"%";}
 // which asserted a causal link that does not exist: closure at month 7 misses
 // the target on every path and still returns about -86.5%. The API supplies
 // the reason, so the page states whichever one actually applies.
-// The reason sentence itself is API copy and is passed through untranslated.
+// The reason sentence carries a translation key (backend/lab.py sets
+// `apr_undefined_reason_key`), so it goes through apiText rather than being
+// passed through as English. It fell back to the raw English field here even
+// when the catalogue had the Vietnamese entry.
 function apr(a){return a.effective_apr==null
   ? t('lab.value.aprUndefined',"Undefined — {reason}",
-      {reason:(a.apr_undefined_reason || t('lab.value.noRoot',"the rate equation has no root"))})
+      {reason:(apiText(a,'apr_undefined_reason') || t('lab.value.noRoot',"the rate equation has no root"))})
   : pct(a.effective_apr,2);}
 // Non-completion inside the observation window, NOT a default.
 function dur(a){return a.duration_months_mean==null
@@ -1228,8 +1314,25 @@ function renderStarters(list){
    value is formatted by the same pct()/num() helpers the rest of the page uses,
    from the same API fields -- so a figure here cannot disagree with the panel
    it summarises. */
+/* The DEFAULT PAIR, stated rather than implied. FIX-A is the cost-matched
+   fixed payment; RBF-ILL is the illustrative revenue share. They are the pair
+   the study prices against each other, and the page says so in words next to
+   the comparison. All four remain one disclosure away. */
+var PAIR = ["FIX-A", "RBF-ILL"];
+
 var QUESTIONS = {
   payments: {
+    /* ONE named aggregate, not mean + p90 + peak at once. The other two stay
+       in the detailed table. `max` is the mean of each path's own peak month,
+       which is what the label has to say -- it is NOT a global worst month. */
+    headline: function(a){ return a.burden.max; },
+    headlineText: function(a){ return pct(a.burden.max,2); },
+    headlineMax: 1,
+    shortKey: "lab.guided.payments.short",
+    shortEn: "Share of a month's sales taken as payment",
+    briefKey: "lab.guided.payments.brief",
+    briefEn: "Average of each path's worst month · payment \u00f7 GMV · active months only",
+    lowerIsSmaller: true,
     titleKey: "lab.guided.payments.title",
     titleEn: "What share of sales goes to payments?",
     basisKey: "lab.guided.payments.basis",
@@ -1243,6 +1346,14 @@ var QUESTIONS = {
     caveat: function(d){ return apiText(d.metric_definitions.burden,'caveat'); }
   },
   recovery: {
+    headline: function(a){ return a.recovery_ratio && a.recovery_ratio["12"]; },
+    headlineText: function(a){ return a.recovery_ratio && a.recovery_ratio["12"]!=null
+      ? pct(a.recovery_ratio["12"],1) : "\u2014"; },
+    headlineMax: 1,
+    shortKey: "lab.guided.recovery.short",
+    shortEn: "Share of this contract's own target recovered by month 12",
+    briefKey: "lab.guided.recovery.brief",
+    briefEn: "Checkpoint at month 12 \u00b7 measured against each contract's own repayment target",
     titleKey: "lab.guided.recovery.title",
     titleEn: "How much of each repayment target is recovered?",
     basisKey: "lab.guided.recovery.basis",
@@ -1255,6 +1366,13 @@ var QUESTIONS = {
     caveat: function(d){ return apiText(d.metric_definitions.recovery_ratio,'caveat'); }
   },
   completion: {
+    headline: function(a){ return a.completed_share; },
+    headlineText: function(a){ return pct(a.completed_share,1); },
+    headlineMax: 1,
+    shortKey: "lab.guided.completion.short",
+    shortEn: "Share of simulated paths that finish repaying within 24 months",
+    briefKey: "lab.guided.completion.brief",
+    briefEn: "500 simulated revenue paths \u00b7 fixed 24-month observation window",
     titleKey: "lab.guided.completion.title",
     titleEn: "How many paths complete repayment within 24 months?",
     basisKey: "lab.guided.completion.basis",
@@ -1265,11 +1383,98 @@ var QUESTIONS = {
   }
 };
 
+/* A comparison MARK: a bar whose length encodes the value on a stated common
+   scale, with the value printed beside it. It is not a time series, not a
+   trend and not decoration -- there is no monthly series behind any of these
+   figures, and none is implied. */
+function markRow(a, q, scaleMax){
+  var v = q.headline(a);
+  var text = q.headlineText(a);
+  var pctWidth = (v == null || !isFinite(v)) ? 0
+    : Math.max(0, Math.min(100, (v / scaleMax) * 100));
+  var kind = a.kind === "rbf" ? "rbf" : "fixed";
+  /* What KIND of thing the figure is, beside the figure. A fixed arm is a
+     scheduled-payment benchmark -- it is modelled as paid in full and on time,
+     so it is not an observed collection record. That has to sit next to the
+     number, not only in the methods panel. */
+  var note = kind === "rbf"
+    ? t('lab.mark.note.rbf', "Payment moves with revenue, collection stops at the cap")
+    : t('lab.mark.note.fixed', "Scheduled payments, modelled as paid in full and on time \u2014 a benchmark, not observed collections");
+  return '<div class="mark mark-'+esc(kind)+'">'+
+    '<div class="mark-head">'+
+      '<span class="mark-name">'+esc(apiText(a,'name'))+'</span>'+
+      '<span class="mark-id">'+esc(a.id)+'</span>'+
+    '</div>'+
+    /* The value comes immediately after the name; the qualifier sits directly
+       beneath it. Still adjacent to the figure, and it lifts both values into
+       the opening viewport in the longer language. */
+    '<div class="mark-row">'+
+      '<span class="mark-bar" aria-hidden="true"><i style="width:'+pctWidth.toFixed(2)+'%"></i></span>'+
+      '<span class="mark-val mono">'+esc(text)+'</span>'+
+    '</div>'+
+    '<p class="mark-note">'+esc(note)+'</p>'+
+    '</div>';
+}
+
+/* The takeaway is DERIVED from the two displayed values for the CURRENT
+   scenario. It never asserts a universal winner, and for recovery it says
+   outright that the ordering depends on the scenario. */
+function renderTakeaway(pair, q){
+  var a = pair[0], b = pair[1];
+  var va = q.headline(a), vb = q.headline(b);
+  var txt;
+  if(va == null || vb == null || !isFinite(va) || !isFinite(vb)){
+    txt = t('lab.take.unavailable', "One of the two figures is not defined in this scenario. The detailed table below shows which.");
+  } else if(QUESTION === "payments"){
+    var lower = va <= vb ? a : b, higher = va <= vb ? b : a;
+    txt = (Math.abs(va - vb) < 1e-12)
+      ? t('lab.take.payments.equal', "Both take the same share of sales here, {v}. A payment share is measured on revenue, not on what the seller keeps, so it does not establish affordability.", {v:q.headlineText(a)})
+      : t('lab.take.payments.lower', "{low} takes the smaller share of sales here, {lowVal} against {highVal}. A payment share is measured on revenue, not on what the seller keeps, so a lower share does not establish affordability.",
+          {low:apiText(lower,'name'), lowVal:q.headlineText(lower), highVal:q.headlineText(higher)});
+  } else if(QUESTION === "recovery"){
+    var ahead = va >= vb ? a : b, behind = va >= vb ? b : a;
+    txt = (Math.abs(va - vb) < 1e-12)
+      ? t('lab.take.recovery.level', "Both have recovered the same share of their own target by month 12 here, {v}. Which one leads depends on the revenue path, and both directions appear across these scenarios.", {v:q.headlineText(a)})
+      : t('lab.take.recovery.ahead', "{ahead} is further along against its own target by month 12 here, {aheadVal} against {behindVal}. Which one leads depends on the revenue path, and both directions appear across these scenarios.",
+          {ahead:apiText(ahead,'name'), aheadVal:q.headlineText(ahead), behindVal:q.headlineText(behind)});
+  } else {
+    var more = va >= vb ? a : b, less = va >= vb ? b : a;
+    txt = (Math.abs(va - vb) < 1e-12)
+      ? t('lab.take.completion.equal', "The same share of simulated paths finishes within 24 months under both, {v}. A path that does not finish is censored by the window, not a predicted default.", {v:q.headlineText(a)})
+      : t('lab.take.completion.more', "More simulated paths finish within 24 months under {more}, {moreVal} against {lessVal}. A path that does not finish is censored by the 24-month window, not a predicted default.",
+          {more:apiText(more,'name'), moreVal:q.headlineText(more), lessVal:q.headlineText(less)});
+  }
+  el("takeaway-text").textContent = txt;
+}
+
 function renderGuided(){
   var d = STATE.data; if(!d) return;
   var q = QUESTIONS[QUESTION] || QUESTIONS.payments;
-  el("guided-q").textContent = t(q.titleKey, q.titleEn);
-  el("guided-basis").textContent = t(q.basisKey, q.basisEn);
+
+  /* ── the primary comparison: the selected PAIR, side by side ─────────── */
+  var byId = {}; d.arms.forEach(function(a){ byId[a.id] = a; });
+  var pair = PAIR.map(function(id){ return byId[id]; }).filter(Boolean);
+  if(pair.length === 2){
+    el("compare-scn").textContent = apiText(d.scenario, 'label');
+    el("guided-q").textContent = t(q.shortKey, q.shortEn);
+    el("guided-basis").textContent = t(q.briefKey, q.briefEn);
+    /* A common scale across BOTH marks, so the two lengths are comparable.
+       No magic floor: if neither value is positive there is nothing to scale
+       against, and the question's own maximum is used. */
+    var vals = pair.map(q.headline).filter(function(v){
+      return v != null && isFinite(v) && v > 0;
+    });
+    var scaleMax = vals.length ? Math.max.apply(null, vals) : q.headlineMax;
+    scaleMax = Math.min(q.headlineMax, scaleMax * 1.15);
+    el("pair").innerHTML = pair.map(function(a){ return markRow(a, q, scaleMax); }).join("");
+    renderTakeaway(pair, q);
+    /* The selection is stated, never implied. */
+    el("pair-scope").textContent = t('lab.pair.scope',
+      "Showing 2 of {n} contracts: {a} and {b}. These two are the pair the study prices against each other, which is why they open the comparison. The other two are in the detail below.",
+      {n:String(d.arms.length), a:apiText(pair[0],'name'), b:apiText(pair[1],'name')});
+  }
+
+  el("guided-basis-full").textContent = t(q.basisKey, q.basisEn);
 
   var cols = q.cols();
   var head = '<tr><th>'+esc(t('lab.dur.col.contract',"Contract"))+'</th>'+
