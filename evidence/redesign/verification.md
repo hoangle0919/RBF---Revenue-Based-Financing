@@ -319,3 +319,80 @@ No engine, research artifact, paper, API schema, scoring implementation or
 production database changed. No submissions, administrator notifications,
 VoiceOver, push, merge or deployment occurred. The only application change is
 guided-table CSS; other changes are regression tests and evidence.
+
+---
+
+## Simulation Lab completion pass — 2026-11-08
+
+This appended entry describes local changes since `9a782bb`; earlier sections
+above are historical evidence and are not rewritten. Full scope and review
+instructions: `HANDOFF-LAB-REDESIGN-2026-11-08.md`. At authoring, this pass is
+uncommitted and local-only: no push, merge or deployment.
+
+### Correctness and preservation
+
+- Full backend suite: **693 passed, 11 skipped, zero failures**. Focused run:
+  **193 passed**, overlapping the full suite rather than additional passes.
+- Node suites: **43 passed**, including **13 new actual-JavaScript Lab tests**
+  covering 13 scenarios × 3 questions × 2 languages, values and takeaway
+  branches, scales, missing/non-finite data, stale responses and errors,
+  native selection atomicity, language repaint and anchor focus.
+- Catalogues: **800 EN / 800 VI**; all **649** referenced keys resolve.
+- **29/29 protected artifacts and PDFs byte-identical and SHA-256 unchanged
+  versus `c136e32`**. No API, engine, scoring or simulation calculation changes.
+- Diff whitespace check clean. Existing untracked `DESIGN-IS-2026-11-04/`
+  preserved.
+
+Skips: nine automated browser tests lack the Playwright Chromium executable;
+one live-FX test is opt-in; one scorer comparison lacks an ensemble artifact.
+None is counted as a pass. The new JavaScript suite uses a minimal DOM and real
+artifact-backed payloads, not a layout engine or assistive technology.
+
+### Main-agent actual-browser checks
+
+**24 states:** EN/VI × Payment share/Target recovery/Completion × 360×800,
+390×844, 768×900 and 1366×768. Zero document horizontal overflow, zero primary
+numeric-value clipping, and equal bar-track widths in the measured states.
+The shared scale is visibly 0–100% across registered scenarios. This browser
+matrix must not be confused with the all-scenario JavaScript payload matrix.
+
+For the default Payment share comparison in Vietnamese, measured FIX-A /
+RBF-ILL numeric-value bottom coordinates were **672.84 / 770.72px** at 360×800,
+**620.84 / 718.72px** at 390×844, **728.36 / 813.61px** at 768×900, and
+**610.83 / 696.06px** at 1366×768. These establish that the two numbers fit in
+those first viewports, not that all accompanying prose is above the fold.
+
+An initial tablet check placed the second value at about **935px**, outside
+the 900px viewport. The compact selector now applies below 900px and the
+tablet rerun produced the passing coordinates above. This failure is recorded
+rather than silently omitted.
+
+Actual mobile month-13 closure Completion showed **100.0% / 23.8%** in both
+languages; language switching preserved the scenario selection. The actual
+`/lab?lang=vi#s-dur` route opened its panel, exposed `#dur-table`, focused
+`s-dur` and produced zero document horizontal overflow.
+
+After a footer wrapping correction, a Vietnamese 390px-wide **200% root-size
+fixture (computed 32px)** had zero document overflow, zero primary numeric
+clipping, and equal **121.8047px** track widths. This is root-relative text
+enlargement, **not browser zoom**, and does not double fixed-pixel text.
+
+Final screenshots delivered by the main agent and verified present on disk:
+
+- `screenshots/lab-desktop-en-final-20261108.jpg`
+- `screenshots/lab-mobile-vi-final-20261108.jpg`
+- `screenshots/lab-tablet-vi-final-20261108.jpg`
+
+No VoiceOver or native Safari testing in this pass; no blanket accessibility
+or usability certification. The read-only preview's FX and prototype routes
+return expected 503 responses; there was no live-FX verification or actual
+submission. No notifications or production data writes occurred.
+
+### Documentation closeout — 2026-11-11
+
+The three final screenshot files above are delivered and their presence was
+rechecked on November 11. All reported tests and browser measurements remain
+dated November 8; this closeout introduced no new audit or application changes.
+Preview servers are stopped and the browser viewport override reset; there is
+no active preview link. The local commit is pending. No push, merge or
+deployment has occurred.

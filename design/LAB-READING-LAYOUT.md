@@ -115,3 +115,25 @@ Priority: useful → understandable → minimal. Honesty is a hard constraint.
 - The takeaway is generated per scenario from API values and never asserts a
   universal winner; recovery explicitly says the ordering depends on scenario.
 - "Showing 2 of 4" is always visible, so the pair is never read as the whole set.
+
+## Completion pass — 2026-11-06 (before application edits)
+
+1. Restore the intended compact hero with Lab-local selectors that win over
+   `institutional.css`; replace the phone starter grid with a labelled native
+   selector containing all 13 API scenarios. Reuse `renderScenarios`,
+   `apiText`, `markSelected`, and the atomic `select` request guard. Keep desktop
+   starters, keyboard operation, language repaint, deep links and error recovery.
+2. Keep the simulation/no-observed-outcomes/non-lending warning visible in a
+   concise bilingual banner, retaining its full explanation in About this study.
+   Shorten only repeated introduction, never metric or contract qualifications.
+3. Keep both marks adjacent and readable, add explicit common-scale endpoints
+   and active-month exclusions beside payment figures. Derive every value from
+   the existing `QUESTIONS` fields, never create a series or alter API/engine data.
+4. Clarify pair selection from `backend/lab.py:ARMS`: FIX-A and RBF-ILL share
+   principal, total repayment and reference-path term; RBF-EQ is the separate
+   reference-rate grid-priced contract. Do not imply equality of realised rates.
+5. Check localization parity/static guards and all Lab tests; parent verifies
+   actual EN/VI browser geometry at 1366×768, 390×844 and 360×800, all scenarios
+   and questions, language switches, enlarged text, error and race handling.
+   Both marks must fit together without shrinking essential type or clipping.
+   Research results, engine, API and papers remain untouched. No deployment.

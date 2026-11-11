@@ -632,9 +632,14 @@ def test_the_primary_comparison_is_the_named_pair_not_all_four():
     for lang, cat in (("en", EN), ("vi", VI)):
         scope = cat["lab.pair.scope"]
         assert "{a}" in scope and "{b}" in scope and "{n}" in scope, lang
-        # the selection is explained, not merely stated
-        assert ("prices against each other" in scope
-                or "định giá đối chiếu" in scope), lang
+        # Explain this pair's actual construction, not the separate grid-price
+        # comparison between FIX-B and RBF-EQ.
+        concepts = (("principal", "total repayment", "term", "reference path")
+                    if lang == "en" else
+                    ("vốn gốc", "tổng hoàn trả", "kỳ hạn", "đường tham chiếu"))
+        for concept in concepts:
+            assert concept in scope, (lang, concept)
+        assert "prices against each other" not in scope
 
 
 def test_the_answer_comes_before_the_methodology():
