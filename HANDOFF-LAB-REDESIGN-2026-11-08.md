@@ -122,6 +122,39 @@ The local commit is pending; nothing has been pushed, merged or deployed.
 
 ## Review prompt for Claude
 
+## Codex takeover review — 2026-11-13
+
+Reviewed committed implementation `9d4e754` against `9a782bb`, including the
+primary comparison, translation changes, regression harness, and the three
+saved final screenshots. No new actionable blocking defect was found in this
+bounded review. This is a follow-up review by the implementing assistant, not
+independent external approval or user acceptance of the design.
+
+Fresh verification:
+
+- All five Node suites: **43 passed**. Catalogue check: **800 EN / 800 VI**,
+  all **649 referenced keys** resolve.
+- Full backend run: **693 passed, 2 skipped, 9 setup errors** because sandbox
+  restrictions prevented the browser fixture binding its local server.
+  An approved rerun of those nine browser tests reached browser startup and
+  **skipped all nine** because the Chromium executable is absent. No browser
+  test pass is claimed for this review.
+- Direct byte comparison against `c136e32`: **29 protected result/PDF files,
+  zero differences**. The comparison was rerun successfully after increasing
+  the inspection command's output buffer for the larger PDF files.
+- The November 8 screenshots were visually inspected; they were not recaptured.
+  The earlier layout measurements remain dated evidence, not newly executed
+  measurements. No VoiceOver, native Safari, contrast certification, or new
+  live-service verification was performed.
+
+No application correction was necessary. Only this review record was appended;
+the existing untracked design-audit folder is preserved. No commit, push,
+merge, deployment, submission, or notification was performed. The next release
+step is authorization to publish the branch and proceed through the release
+review; the missing automated-browser execution remains an explicit limit.
+
+### Original review prompt
+
 ```text
 Review the completed Simulation Lab changes read-only in
 /Users/hoanglh/RBF-Revenue-Based-Financing/worktrees/bilingual-daily-fx.
