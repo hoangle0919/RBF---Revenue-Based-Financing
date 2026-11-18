@@ -748,3 +748,86 @@ def test_findings_are_collapsed_while_limitations_stay_open():
     assert before.count("<details") - before.count("</details>") == 0, (
         "limitations must not be collapsed"
     )
+
+
+# ── B1: a conditional label must keep its condition in both languages ──────
+
+def test_conditional_labels_carry_a_key_matching_their_own_condition():
+    """A-9: a mean taken over a subset has to say which subset.
+
+    `apr_label` and `duration_label` change with the data. A single shared
+    catalogue key was attached to every arm, and because `apiText` prefers the
+    catalogue, the qualifier was discarded -- so a duration averaged over 23.8%
+    of paths rendered as a plain "Mean duration" in English and Vietnamese
+    alike. The key is now chosen by the branch that chose the English.
+    """
+    seen_plain = seen_completed = seen_rate_defined = False
+    for scenario in SCENARIOS:
+        for arm in client.get(f"/api/lab/comparison/{scenario}").json()["arms"]:
+            completed = arm["completed_share"]
+            apr_key = arm.get("apr_label_key")
+            dur_key = arm.get("duration_label_key")
+            assert apr_key and dur_key, f"{scenario}/{arm['id']}"
+
+            # duration: qualified exactly when some but not all paths complete
+            if 0.0 < completed < 1.0:
+                assert dur_key == "labpage.arm.durationLabelCompleted", (
+                    f"{scenario}/{arm['id']}: completed={completed}")
+                assert "among completed paths" in arm["duration_label"]
+                seen_completed = True
+            else:
+                assert dur_key == "labpage.arm.durationLabel", (
+                    f"{scenario}/{arm['id']}: completed={completed}")
+                assert "among" not in arm["duration_label"]
+                seen_plain = True
+
+            # rate: qualified when the rate's denominator is not every path
+            if arm["apr_defined_share"] > 0 and completed < 1.0:
+                assert apr_key == "labpage.arm.aprLabelRateDefined", (
+                    f"{scenario}/{arm['id']}")
+                assert "among rate-defined paths" in arm["apr_label"]
+                seen_rate_defined = True
+
+            # the key must resolve, non-empty, in BOTH catalogues
+            for lang, cat in (("en", EN), ("vi", VI)):
+                for key in (apr_key, dur_key):
+                    assert cat.get(key, "").strip(), f"{lang} missing {key}"
+
+    assert seen_plain, "no unqualified case exercised"
+    assert seen_completed, "no completed-only case exercised"
+    assert seen_rate_defined, "no rate-defined case exercised"
+
+
+def test_the_qualified_label_survives_translation_in_both_languages():
+    """The defect was invisible in the API and only appeared after lookup."""
+    for lang, cat in (("en", EN), ("vi", VI)):
+        plain_apr = cat["labpage.arm.aprLabel"]
+        qual_apr = cat["labpage.arm.aprLabelRateDefined"]
+        plain_dur = cat["labpage.arm.durationLabel"]
+        qual_dur = cat["labpage.arm.durationLabelCompleted"]
+        assert qual_apr != plain_apr, f"{lang}: rate qualifier collapses to the plain label"
+        assert qual_dur != plain_dur, f"{lang}: duration qualifier collapses to the plain label"
+        assert len(qual_apr) > len(plain_apr), lang
+        assert len(qual_dur) > len(plain_dur), lang
+        if lang == "en":
+            assert "rate-defined" in qual_apr and "completed paths" in qual_dur
+        else:
+            assert "tỷ suất xác định" in qual_apr and "đã hoàn tất" in qual_dur
+
+
+def test_the_undefined_rate_label_has_its_own_key_even_though_no_scenario_hits_it():
+    """`apr_defined <= 0` yields "Effective APR", not a mean.
+
+    No registered scenario reaches it, so this drives the branch directly
+    rather than waiting for an artifact that does. Collapsing it onto the
+    shared key would label a non-existent mean as a mean.
+    """
+    from backend import lab as lab_mod
+
+    out = lab_mod._censoring({"completed_rate": 0.0, "apr_defined_rate": 0.0,
+                              "incomplete_recovery_rate": 1.0})
+    assert out["apr_label"] == "Effective APR"
+    assert out["apr_label_key"] == "labpage.arm.aprLabelUndefined"
+    for lang, cat in (("en", EN), ("vi", VI)):
+        assert cat.get("labpage.arm.aprLabelUndefined", "").strip(), lang
+        assert cat["labpage.arm.aprLabelUndefined"] != cat["labpage.arm.aprLabel"], lang

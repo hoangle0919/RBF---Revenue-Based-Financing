@@ -495,6 +495,7 @@ def _censoring(a: dict) -> dict:
     # ---- duration: conditioned on completion ------------------------------
     if 0.0 < completed < 1.0:
         duration_label = "Mean duration among completed paths"
+        duration_label_key = "labpage.arm.durationLabelCompleted"
         duration_basis = (
             f"Averaged over the {completed:.1%} of simulated paths that reached "
             f"the repayment target within 24 months. The remaining "
@@ -502,24 +503,29 @@ def _censoring(a: dict) -> dict:
             f"not counted as long.")
     elif completed >= 1.0:
         duration_label = "Mean duration"
+        duration_label_key = "labpage.arm.durationLabel"
         duration_basis = ("Mean across simulated paths for this scenario. Every "
                           "path reached the repayment target.")
     else:
         duration_label = "Mean duration"
+        duration_label_key = "labpage.arm.durationLabel"
         duration_basis = "No path reached the repayment target within 24 months."
 
     # ---- rate: conditioned on IRR existence, NOT on completion ------------
     if apr_defined <= 0.0:
         apr_label = "Effective APR"
+        apr_label_key = "labpage.arm.aprLabelUndefined"
         apr_basis = ("No payment was made on any simulated path, so the rate "
                      "equation has no root and no APR is defined.")
     elif completed >= 1.0:
         apr_label = "Mean simulated APR"
+        apr_label_key = "labpage.arm.aprLabel"
         apr_basis = ("Mean across simulated paths for this scenario. Every path "
                      "has a defined rate and every path reached the repayment "
                      "target.")
     else:
         apr_label = "Mean simulated APR among rate-defined paths"
+        apr_label_key = "labpage.arm.aprLabelRateDefined"
         apr_basis = (
             f"Averaged over the {apr_defined:.1%} of simulated paths with a "
             f"defined internal rate of return — a different set from the "
@@ -545,6 +551,10 @@ def _censoring(a: dict) -> dict:
         "denominators_differ": abs(apr_defined - completed) > 1e-12,
         "apr_label": apr_label,
         "duration_label": duration_label,
+        # Carried beside the text so the catalogue entry tracks the CONDITION
+        # the text describes, not merely the field name.
+        "apr_label_key": apr_label_key,
+        "duration_label_key": duration_label_key,
         "apr_basis": apr_basis,
         "duration_basis": duration_basis,
     }
@@ -664,8 +674,15 @@ def _arm_block(spec: dict, scenario: str) -> Optional[dict]:
         block["note_params"] = dict(_g["params"])
         block["note_param_keys"] = {"grid": _g["key"]}
     _k(block, "cap_basis", f"labpage.arm.{aid}.capBasis")
-    _k(block, "apr_label", "labpage.arm.aprLabel")
-    _k(block, "duration_label", "labpage.arm.durationLabel")
+    # B1: these two labels CHANGE WITH THE DATA -- A-9 requires a mean taken
+    # over a subset to say which subset. One shared catalogue key was attached
+    # to every arm, and because apiText prefers the catalogue, the qualifier
+    # ("among completed paths" / "among rate-defined paths") was discarded in
+    # both languages. The key is now chosen by the same branch that chose the
+    # English, so the translation cannot drop the condition.
+    _k(block, "apr_label", block.pop("apr_label_key", "labpage.arm.aprLabel"))
+    _k(block, "duration_label",
+       block.pop("duration_label_key", "labpage.arm.durationLabel"))
     _k(block, "apr_basis", f"labpage.arm.{aid}.aprBasis")
     _k(block, "duration_basis", f"labpage.arm.{aid}.durationBasis")
     _k(block, "recovery_denominator", f"labpage.arm.{aid}.recoveryDenominator")
