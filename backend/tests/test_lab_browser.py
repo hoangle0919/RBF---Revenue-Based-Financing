@@ -263,18 +263,19 @@ def test_censored_arm_shows_both_denominators_separately(server, browser):
     pg.evaluate("document.querySelector('#scn-groups button[data-k=closure_m13]').click()")
     pg.wait_for_timeout(900)
 
-    # ---- what a reader sees WITHOUT opening anything -----------------------
+    # ---- what the card shows once its section is open ----------------------
     #
-    # This split matters and the first version of this test missed it. The two
-    # basis blocks live inside `<details><summary>What this contract is`, which
-    # has no `open` attribute, so `inner_text` — which returns RENDERED text —
-    # cannot see them. Asserting on them here failed against a page that
-    # implements them correctly, and the failure looked like a missing feature.
-    #
-    # Reading it that way would have been a real mistake: the suggested remedy
-    # was to weaken the assertion or restate the page's disclosure, when the
-    # page was right and the test was reaching into a collapsed widget.
+    # The reading-experience redesign put the four contract cards inside a
+    # "Contracts compared" panel that ships CLOSED, so `#arms` renders no text
+    # until that panel is opened. The assertions below stay VISIBILITY
+    # assertions on purpose -- `text_content()` would pass on a `display:none`
+    # node and prove nothing -- so the section is opened first and the card's
+    # own "What this contract is" disclosure is left shut, which is the split
+    # the rest of this test depends on.
+    pg.evaluate("document.querySelector('#s-arms details.panel').open = true")
+    pg.wait_for_timeout(200)
     arms_text = pg.inner_text("#arms")
+    assert arms_text.strip(), "the contracts section rendered no visible text"
 
     # Both denominators are on the card, labelled as different quantities.
     assert "Paths completing within 24 months" in arms_text
@@ -305,12 +306,21 @@ def test_censored_arm_shows_both_denominators_separately(server, browser):
     assert "How the duration mean is computed" in disclosed
     assert "observed" in disclosed and "window" in disclosed
 
+    # The settlement table and the findings live in their own optional
+    # sections, which also ship closed. Opened, not read through
+    # `text_content()`, for the same reason as above.
+    pg.evaluate("document.querySelector('#s-dur details.panel').open = true;"
+                "document.querySelector('#s-find details.panel').open = true")
+    pg.wait_for_timeout(200)
+
     table = pg.inner_text("#dur-table")
+    assert table.strip(), "the settlement section rendered no visible text"
     assert "completed paths only" in table
     # the header is CSS-uppercased, so compare case-insensitively
     assert "completed in 24 mo" in table.lower()
 
     findings = pg.inner_text("#findings")
+    assert findings.strip(), "the findings section rendered no visible text"
     assert "cannot be compared on rate alone" not in findings
     # Censoring is still reported, and still not called default.
     assert "76.2%" in findings
@@ -319,18 +329,54 @@ def test_censored_arm_shows_both_denominators_separately(server, browser):
 
 
 def test_uncensored_arm_shows_no_spurious_qualifier(server, browser):
-    """At `stable` every path completes and every path has a rate, so the two
-    denominators coincide and neither qualifier belongs on the page."""
+    """At `stable` every path completes and every path has a rate.
+
+    The two DENOMINATORS coincide, so neither conditional qualifier belongs on
+    the card. The completion PERCENTAGE is a different thing: it is shown
+    unconditionally, and at an uncensored scenario it must read 100.0% rather
+    than disappear. The primary Completion view does not remove the need for
+    denominator context beside the detailed statistics, so both are checked
+    here -- the row is present, and the qualifiers are not.
+    """
     pg = browser.new_page(viewport={"width": 1440, "height": 1000})
     pg.goto(f"{server}/lab", wait_until="networkidle")
     pg.wait_for_timeout(700)
     pg.evaluate("document.querySelector('#scn-groups button[data-k=stable]').click()")
     pg.wait_for_timeout(800)
+    # Visibility assertion, so the section is opened rather than read through
+    # `text_content()`.
+    pg.evaluate("document.querySelector('#s-arms details.panel').open = true")
+    pg.wait_for_timeout(200)
     arms_text = pg.inner_text("#arms")
+    assert arms_text.strip(), "the contracts section rendered no visible text"
+
+    # No conditional qualifier, because nothing is conditioned here.
     assert "among completed paths" not in arms_text
     assert "among rate-defined paths" not in arms_text
-    assert "Paths completing within 24 months" not in arms_text
     assert "Paths with a defined rate" not in arms_text
+    assert "Observed-window rate" not in arms_text
+
+    # The completion row IS present, and reads 100.0% at an uncensored
+    # scenario. It used to vanish at exactly full completion, which removed
+    # the answer precisely when it was complete.
+    assert "Paths completing within 24 months" in arms_text
+    completing = arms_text.split("Paths completing within 24 months", 1)[1]
+    assert completing.lstrip().startswith("100.0%"), completing[:40]
+
+    # The unqualified labels, since every path completes and every path has a
+    # rate.
     assert "Mean simulated APR" in arms_text and "Mean duration" in arms_text
-    assert "completed paths only" not in pg.inner_text("#dur-table")
+
+    # The settlement table lives in its own section, which also ships closed.
+    # Asserting the qualifier's ABSENCE against a collapsed panel would pass
+    # for the wrong reason -- `inner_text` returns "" either way -- so the
+    # section is opened and confirmed to render before the negative check.
+    pg.evaluate("document.querySelector('#s-dur details.panel').open = true")
+    pg.wait_for_timeout(200)
+    dur_table = pg.inner_text("#dur-table")
+    assert dur_table.strip(), "the settlement section rendered no visible text"
+    # the headers are CSS-uppercased, so compare case-insensitively, as the
+    # censored-scenario test above already does
+    assert "mean duration" in dur_table.lower()   # the table really is rendered
+    assert "completed paths only" not in dur_table.lower()
     pg.close()

@@ -557,16 +557,37 @@ def test_page_loads_no_framework_or_third_party_asset():
     for bad in ("cdn.", "unpkg", "jsdelivr", "googleapis", "react", "vue",
                 "jquery", "chart.js", "d3.", "gtag", "analytics"):
         assert bad not in html.lower(), f"third-party dependency: {bad}"
-    assert html.count("<script") == 1
-    assert "src=" not in html.split("<script")[1].split(">")[0]
+    # Two scripts now: the first-party i18n runtime, then the page's own inline
+    # client. Still hand-written, still no third party -- which is what this
+    # guard is actually about.
+    # Three scripts now: the i18n runtime, the FX display adapter, then the
+    # page's own inline client. Still hand-written, still no third party.
+    assert html.count("<script") == 3
+    assert '<script src="/i18n.js" defer></script>' in html
+    assert '<script src="/fx-display.js" defer></script>' in html
+    assert "src=" not in html.split("<script")[3].split(">")[0], (
+        "the page's own client must stay inline"
+    )
 
 
 def test_inline_javascript_stays_small():
     """Measured, not estimated. A budget that fails loudly if the page grows a
-    framework by accident."""
+    framework by accident.
+
+    History: 40,000 -> 52,000 for the guided layer, then -> 58,000 for the
+    reading-experience redesign, which added the paired comparison, the
+    comparison marks and the scenario-dependent takeaway. Measured after that
+    work: 55,431 B, leaving about 2.5 kB.
+
+    The budget is a scoped, measured ceiling on THIS file, not a claim that a
+    larger number would be slow: review has noted that extracting the script
+    solely to satisfy a file-local budget would not reduce shipped bytes. Its
+    job is to make unexplained growth fail loudly, which a ~2.5 kB headroom
+    does.
+    """
     html = open(LAB_HTML, encoding="utf-8").read()
     js = html.split("<script>", 1)[1].rsplit("</script>", 1)[0]
-    assert len(js.encode()) < 40_000, f"inline JS is {len(js.encode()):,} B"
+    assert len(js.encode()) < 58_000, f"inline JS is {len(js.encode()):,} B"
 
 
 # Principle 5 (unobtrusive) — scored 3, must not regress.
@@ -646,7 +667,11 @@ def test_server_error_text_is_never_rendered_to_the_user():
     assert "console.warn" in html
     # Superseded by D-036: the panel is no longer handed ANY exception message,
     # safe or otherwise. Every path is routed through publicMessage().
-    assert 'show("error", publicMessage(e))' in html
+    # The call now also passes a catalogue key so the panel can render the
+    # message in the reader's language. The invariant is unchanged: what reaches
+    # the panel is chosen by us, never the exception text.
+    assert 'show("error", publicMessage(e), publicKey(e))' in html
+    assert "publicKey(" in html
     assert "body.detail" not in html and "(body&&body.detail)" not in html
 
 
@@ -819,8 +844,16 @@ def test_fully_incomplete_arms_report_duration_undefined_but_keep_their_rate():
 
 def test_the_page_renders_the_api_supplied_labels_not_fixed_ones():
     html = open(LAB_HTML, encoding="utf-8").read()
-    assert "kv(a.apr_label," in html and "kv(a.duration_label," in html
+    # The label still comes from the API. It is now routed through the
+    # additive resolver, which prefers the API's `<field>_key` translation and
+    # falls back to the API's own English `<field>` when no catalogue entry
+    # resolves -- so the page still never carries its own fixed label.
+    assert "kv(apiText(a,'apr_label')" in html
+    assert "kv(apiText(a,'duration_label')" in html
     assert 'kv("Mean simulated APR"' not in html
+    assert "return obj[field] == null ? '' : obj[field];" in html, (
+        "apiText must fall back to the API's own English field, not to a literal"
+    )
 
 
 def test_metric_definitions_disclose_the_conditioning_of_each_mean():
@@ -901,9 +934,25 @@ def test_public_safe_is_a_whitelist_not_a_blacklist():
 # ── survivor presentation reaches the reader ───────────────────────────────
 
 def test_completion_share_is_a_visible_card_row():
+    """And an UNCONDITIONAL one.
+
+    The row used to be gated on `completed_share < 1`, so at exactly 100% the
+    figure disappeared from the card -- while "how many paths complete within
+    24 months?" is one of the page's primary questions. The settlement cell
+    separately used to substitute a hard-coded full-recovery string when
+    incomplete recovery was zero, which made it the only research figure on the
+    page not formatted from the artifact. Both are pinned here.
+    """
     js = open(LAB_HTML, encoding="utf-8").read()
-    assert 'kv("Paths completing within 24 months", pct(a.completed_share,1))' in js
-    assert "a.incomplete_recovery_rate>0" in js
+    assert "pct(a.completed_share,1)" in js
+    assert_copy("lab.arm.pathsCompleting", "Paths completing within 24 months", js)
+    assert '"100.0%"' not in js, (
+        "completion must be formatted from completed_share, never a literal"
+    )
+    card = js.split("function renderArms(arms){", 1)[1].split("\n}\n", 1)[0]
+    assert "lab.arm.pathsCompleting" in card
+    gated = "a.completed_share<1\n          ? kv(t('lab.arm.pathsCompleting'"
+    assert gated not in js, "the completion row must not be gated on partial completion"
 
 
 def test_settlement_table_qualifies_the_duration_cell_per_row():
@@ -923,7 +972,8 @@ def test_arm_disclosure_carries_the_api_supplied_basis():
     averages", which left the rate's basis unrendered entirely.
     """
     js = open(LAB_HTML, encoding="utf-8").read()
-    assert "a.duration_basis" in js and "a.apr_basis" in js
+    assert "apiText(a,'duration_basis')" in js
+    assert "apiText(a,'apr_basis')" in js
     assert "How the duration mean is computed" in js
     assert "How the rate is computed" in js
     assert "How these averages are computed" not in js, (
@@ -1025,3 +1075,32 @@ def test_fully_incomplete_scenario_reports_a_rate_and_no_duration():
             assert a["effective_apr"] is not None
     txt = " ".join(f["text"] for f in d["findings"])
     assert "cannot be compared on rate alone" not in txt
+
+
+# ── i18n-aware copy assertions ───────────────────────────────────────────────
+# Honesty-critical copy moved out of the pages and into frontend/i18n/*.json
+# when the site became bilingual. A guard that greps only the HTML would
+# silently start passing the moment a string moved, which is the failure mode
+# these guards exist to prevent. These helpers bind the assertion to wherever
+# the text actually lives, and require it in BOTH languages -- a disclaimer
+# that exists only in English is not a disclaimer for a Vietnamese reader.
+
+def _catalogue(lang):
+    import json, os
+    p = os.path.join(REPO, "frontend", "i18n", f"{lang}.json")
+    with open(p, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def assert_copy(key, english_substring, page_src=None):
+    """The key must exist in both catalogues, carry the required English text,
+    and -- when a page source is given -- actually be referenced by that page."""
+    en, vi = _catalogue("en"), _catalogue("vi")
+    assert key in en, f"{key} missing from en.json"
+    assert key in vi, f"{key} missing from vi.json"
+    assert english_substring.lower() in en[key].lower(), (
+        f"{key} no longer carries required copy {english_substring!r}: {en[key]!r}"
+    )
+    assert vi[key].strip(), f"{key} has no Vietnamese text; it would render blank"
+    if page_src is not None:
+        assert key in page_src, f"{key} is defined but never referenced by the page"

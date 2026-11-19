@@ -1,0 +1,32 @@
+{
+  "_comment": [
+    "Allowlist for the residual-English scan (tools/scan_residual_english.js).",
+    "A text node matching one of these is NOT a translation gap. Every entry",
+    "names WHY it is exempt, because an unexplained allowlist is how a real gap",
+    "gets hidden. Nothing here is prose a reader needs translated."
+  ],
+  "proper_names": {
+    "why": "Names of companies, platforms, people and tools. Translating them would be wrong.",
+    "patterns": ["RBF", "Shopee", "Lazada", "TikTok Shop", "Vietnam", "FastAPI", "SQLite", "scikit-learn", "Python", "GitHub", "Railway", "MIT", "arXiv", "SSRN", "LinkedIn", "Monte Carlo", "Le Huu Hoang", "Huu Hoang Le"]
+  },
+  "units_and_currency_codes": {
+    "why": "ISO codes and discipline-standard abbreviations, used identically in Vietnamese financial writing.",
+    "patterns": ["VND", "USD", "GMV", "APR", "IRR", "SHA-256", "SHA256"]
+  },
+  "identifiers": {
+    "why": "Arm ids, claim ids, amendment ids, artifact filenames, checksums and spec versions are verbatim references into the research record. Translating one would break the reference.",
+    "patterns": ["RBF-EQ", "RBF-ILL", "FIX-A", "FIX-B", "f*", "^[A-Z]-\\d+$", "^P\\d$", "^S-\\d+$", "^D-\\d+$", "^baseline[\\w]*_canonical\\.json$", "^validation_[\\w.]+$", "^temp_closure$", "^closure_m\\d+$", "^[0-9a-f]{12,}$", "^METHODOLOGY_SPEC\\.md.*$", "^[\\w.]+\\.(md|json|py|pdf|html)$"]
+  },
+  "known_exemptions": [
+    {
+      "where": "index.html -- .paper-spine span",
+      "text": "RBF / RESEARCH 2026",
+      "why": "Decorative typography on the paper-spine mark, carrying aria-hidden=\"true\". It is a visual device, not reader copy, and assistive technology skips it."
+    },
+    {
+      "where": "index.html -- <noscript> block",
+      "text": "The decline example is shown. Interaction needs JavaScript.",
+      "why": "OPEN GAP, not a false positive. <noscript> content is inert while JavaScript runs, so the i18n runtime can never reach it; with JavaScript off there is no runtime to translate it either. It carries data-i18n=\"figure.noscript\" so a future server-side language pass can fill it. Until then the no-JavaScript fallback is English only. Recorded, NOT claimed fixed."
+    }
+  ]
+}

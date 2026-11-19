@@ -192,7 +192,40 @@ ARMS = [
              "revenue-based repayment."},
 ]
 
+# Short reader-facing references used inside composed sentences. FIX-A and
+# RBF-ILL are internal identifiers; a sentence that compares two of four arms
+# has to name which two in words a first-time reader can follow, with the id
+# kept as a secondary reference.
+def _target_vnd(arm: dict):
+    """The arm's repayment target in VND, or None if it has no structured one."""
+    t = arm.get("repayment_target")
+    if isinstance(t, dict) and isinstance(t.get("amount"), dict):
+        return t["amount"].get("vnd")
+    return None
+
+
+FIX_A_REF = "the cost-matched fixed payment (FIX-A)"
+RBF_ILL_REF = "the illustrative revenue-based contract (RBF-ILL)"
+
 _CACHE: Dict[str, dict] = {}
+
+
+# ── Presentation localization (F7) ───────────────────────────────────────────
+# Additive only. Every existing English field keeps its exact value and meaning;
+# a sibling `<field>_key` names the catalogue entry a localized client should
+# prefer, and `<field>_params` / `<field>_param_keys` carry the interpolation
+# values for prose that contains scenario-dependent numbers. Numbers are NEVER
+# frozen into a catalogue string -- they travel as parameters, so a translated
+# finding cannot drift from the artifact it describes.
+#
+# Identifiers, source paths, checksums, spec versions and money `display`
+# strings are deliberately NOT keyed: they are data, not prose.
+
+def _k(obj: dict, field: str, key: str) -> dict:
+    """Attach a translation key beside an existing prose field."""
+    if obj.get(field) is not None:
+        obj[f"{field}_key"] = key
+    return obj
 
 
 def _load(stem: str) -> Optional[dict]:
@@ -260,34 +293,61 @@ def _grid_pricing() -> dict:
 NUMERICAL_ROOT_F = "1.09462066267694"
 
 
-def _grid_pricing_sentence() -> str:
-    """The pricing statement, built from the artifact.
+def _grid_pricing_parts() -> dict:
+    """The pricing statement as a TRANSLATABLE key plus artifact-sourced params.
 
     Says three things, in order: what the registered value **is** (nearest point
     on a 0.0005-step grid), what its residual **means** (grid resolution), and
     what the residual does **not** mean (that no `f` attains the target).
+
+    It used to return finished English prose, which was then inserted into a
+    Vietnamese sentence as a `{grid}` parameter -- so a Vietnamese reader got a
+    Vietnamese wrapper around a whole English paragraph. The residual-English
+    scanner could not see it, because it skips any text node that contains a
+    Vietnamese diacritic and the surrounding wrapper supplied one. The prose is
+    now a catalogue entry in both languages and only the FIGURES travel as
+    parameters, so they still come from the artifact at request time.
     """
     p = _grid_pricing()
     a, t, r = p["achieved_apr"], p["benchmark_apr"], p["residual_pp"]
     if a is None or t is None:
-        return ("The cost-matched cap factor is the nearest point found on the "
-                "registered search grid, not a solved root; the pricing artifact "
-                "needed to quote the residual is not loaded.")
+        return {
+            "key": "labpage.grid.unavailable",
+            "params": {},
+            "text": ("The cost-matched cap factor is the nearest point found on "
+                     "the registered search grid, not a solved root; the pricing "
+                     "artifact needed to quote the residual is not loaded."),
+        }
     if p["exact_match"]:
-        return (f"The cost-matched cap factor is the nearest point found on the "
-                f"registered 0.0005-step search grid. On this sweep that point "
-                f"lands on the benchmark's {t:.6%} to displayed precision.")
-    return (
-        f"The cost-matched cap factor is the NEAREST POINT FOUND ON THE "
-        f"REGISTERED 0.0005-step search grid: it prices at {a:.6%} against the "
-        f"amortizing loan's {t:.6%}, a residual of about {r:.5f} percentage "
-        f"points. That residual is a GRID-RESOLUTION result — it reflects how "
-        f"finely the search was stepped, not a limit on what is attainable. "
-        f"Within an interval where the paying-month count stays fixed, the "
-        f"clipped final payment changes continuously with the cap factor, so "
-        f"the effective APR does too; a numerical root exists on the reference "
-        f"path at approximately f = {NUMERICAL_ROOT_F}. Changes in the "
-        f"paying-month count create kinks in that relationship, not gaps.")
+        return {
+            "key": "labpage.grid.exact",
+            "params": {"benchmark": f"{t:.6%}"},
+            "text": (f"The cost-matched cap factor is the nearest point found on "
+                     f"the registered 0.0005-step search grid. On this sweep that "
+                     f"point lands on the benchmark's {t:.6%} to displayed "
+                     f"precision."),
+        }
+    return {
+        "key": "labpage.grid.residual",
+        "params": {"achieved": f"{a:.6%}", "benchmark": f"{t:.6%}",
+                   "residual": f"{r:.5f}", "rootF": f"{NUMERICAL_ROOT_F}"},
+        "text": (
+            f"The cost-matched cap factor is the NEAREST POINT FOUND ON THE "
+            f"REGISTERED 0.0005-step search grid: it prices at {a:.6%} against the "
+            f"amortizing loan's {t:.6%}, a residual of about {r:.5f} percentage "
+            f"points. That residual is a GRID-RESOLUTION result — it reflects how "
+            f"finely the search was stepped, not a limit on what is attainable. "
+            f"Within an interval where the paying-month count stays fixed, the "
+            f"clipped final payment changes continuously with the cap factor, so "
+            f"the effective APR does too; a numerical root exists on the reference "
+            f"path at approximately f = {NUMERICAL_ROOT_F}. Changes in the "
+            f"paying-month count create kinks in that relationship, not gaps."),
+    }
+
+
+def _grid_pricing_sentence() -> str:
+    """The English rendering, for the fields that still carry plain prose."""
+    return _grid_pricing_parts()["text"]
 
 
 def _resolve(track: str, scenario: str):
@@ -319,6 +379,9 @@ def manifest() -> dict:
         out.append({
             "artifact": f"{stem}_canonical.json",
             "role": role,
+            # The stem is a stable artifact identifier, so it keys the role
+            # description without pinning any figure from the file.
+            "role_key": f"labpage.artifactRole.{stem}",
             "sha256": _checksum(stem),
             "spec_version": c.get("spec_version"),
             "schema_version": c.get("schema_version"),
@@ -351,8 +414,10 @@ def manifest() -> dict:
             "note": _grid_pricing_sentence() + " Rates realised on simulated "
                     "paths differ again, because duration moves with revenue.",
         },
-        "claim_taxonomy": CLAIM_TAXONOMY,
+        "claim_taxonomy": _keyed_taxonomy(),
         "glossary": GLOSSARY,
+        # Ordered and keyed. `glossary` above is unchanged for existing readers.
+        "glossary_keyed": _keyed_glossary(),
         "integrity": {
             "data_basis": "SIMULATED. No observed seller revenue, repayment or "
                           "default outcome exists in this project.",
@@ -379,7 +444,10 @@ def scenarios() -> List[dict]:
     for k, v in SCENARIOS.items():
         stem, _ = _resolve("illustrative", k)
         if stem:
-            out.append({"key": k, **v, "available": True})
+            item = {"key": k, **v, "available": True}
+            _k(item, "label", f"labpage.scenario.{k}.label")
+            _k(item, "description", f"labpage.scenario.{k}.description")
+            out.append(item)
     return sorted(out, key=lambda s: s["order"])
 
 
@@ -427,6 +495,7 @@ def _censoring(a: dict) -> dict:
     # ---- duration: conditioned on completion ------------------------------
     if 0.0 < completed < 1.0:
         duration_label = "Mean duration among completed paths"
+        duration_label_key = "labpage.arm.durationLabelCompleted"
         duration_basis = (
             f"Averaged over the {completed:.1%} of simulated paths that reached "
             f"the repayment target within 24 months. The remaining "
@@ -434,24 +503,29 @@ def _censoring(a: dict) -> dict:
             f"not counted as long.")
     elif completed >= 1.0:
         duration_label = "Mean duration"
+        duration_label_key = "labpage.arm.durationLabel"
         duration_basis = ("Mean across simulated paths for this scenario. Every "
                           "path reached the repayment target.")
     else:
         duration_label = "Mean duration"
+        duration_label_key = "labpage.arm.durationLabel"
         duration_basis = "No path reached the repayment target within 24 months."
 
     # ---- rate: conditioned on IRR existence, NOT on completion ------------
     if apr_defined <= 0.0:
         apr_label = "Effective APR"
+        apr_label_key = "labpage.arm.aprLabelUndefined"
         apr_basis = ("No payment was made on any simulated path, so the rate "
                      "equation has no root and no APR is defined.")
     elif completed >= 1.0:
         apr_label = "Mean simulated APR"
+        apr_label_key = "labpage.arm.aprLabel"
         apr_basis = ("Mean across simulated paths for this scenario. Every path "
                      "has a defined rate and every path reached the repayment "
                      "target.")
     else:
         apr_label = "Mean simulated APR among rate-defined paths"
+        apr_label_key = "labpage.arm.aprLabelRateDefined"
         apr_basis = (
             f"Averaged over the {apr_defined:.1%} of simulated paths with a "
             f"defined internal rate of return — a different set from the "
@@ -477,6 +551,10 @@ def _censoring(a: dict) -> dict:
         "denominators_differ": abs(apr_defined - completed) > 1e-12,
         "apr_label": apr_label,
         "duration_label": duration_label,
+        # Carried beside the text so the catalogue entry tracks the CONDITION
+        # the text describes, not merely the field name.
+        "apr_label_key": apr_label_key,
+        "duration_label_key": duration_label_key,
         "apr_basis": apr_basis,
         "duration_basis": duration_basis,
     }
@@ -526,8 +604,9 @@ def _arm_block(spec: dict, scenario: str) -> Optional[dict]:
     if spec.get("note_grid"):
         note = _grid_pricing_sentence() + " " + note
 
-    return {
-        "id": spec["id"],
+    aid = spec["id"]
+    block = {
+        "id": aid,
         "name": spec["name"],
         "short": spec["short"],
         "chart_label": chart_label,
@@ -566,6 +645,101 @@ def _arm_block(spec: dict, scenario: str) -> Optional[dict]:
         "recovery_denominator": ("Contractual cap (advance × cap factor)" if has_cap
                                  else "Scheduled total repayment (this loan has no cap)"),
     }
+    # Prose fields gain a sibling key; identifiers, checksums and money
+    # `display` strings do not. The English values above are untouched.
+    # Same reasoning for the illustrative arm's name, which quotes its cap
+    # factor: the figure comes from the artifact, so it travels as a parameter.
+    if aid == "RBF-ILL" and f is not None:
+        block["name_key"] = "labpage.arm.RBF-ILL.nameFmt"
+        block["name_params"] = {"f": _fmt_factor(f)}
+    else:
+        _k(block, "name", f"labpage.arm.{aid}.name")
+    _k(block, "short", f"labpage.arm.{aid}.short")
+    # The chart label carries the artifact's own cap factor. Keying the
+    # RESOLVED label would re-freeze that figure in a translation string -- the
+    # exact staleness the `chart_label_fmt` indirection was introduced to
+    # remove. The FORMAT is translated; the number travels as a parameter.
+    if spec.get("chart_label_fmt") and f is not None:
+        block["chart_label_key"] = "labpage.arm.chartLabelFmt"
+        block["chart_label_params"] = {"f": _fmt_factor(f)}
+    else:
+        _k(block, "chart_label", f"labpage.arm.{aid}.chartLabel")
+    _k(block, "note", f"labpage.arm.{aid}.note")
+    # The cost-matched arm's note quotes the grid residual, which is read from
+    # the registered artifact at request time. It travels as a parameter so the
+    # translated note cannot outlive the sweep it describes.
+    if aid == "RBF-EQ":
+        _g = _grid_pricing_parts()
+        # The grid sentence is itself translated; only its figures are params.
+        block["note_params"] = dict(_g["params"])
+        block["note_param_keys"] = {"grid": _g["key"]}
+    _k(block, "cap_basis", f"labpage.arm.{aid}.capBasis")
+    # B1: these two labels CHANGE WITH THE DATA -- A-9 requires a mean taken
+    # over a subset to say which subset. One shared catalogue key was attached
+    # to every arm, and because apiText prefers the catalogue, the qualifier
+    # ("among completed paths" / "among rate-defined paths") was discarded in
+    # both languages. The key is now chosen by the same branch that chose the
+    # English, so the translation cannot drop the condition.
+    _k(block, "apr_label", block.pop("apr_label_key", "labpage.arm.aprLabel"))
+    _k(block, "duration_label",
+       block.pop("duration_label_key", "labpage.arm.durationLabel"))
+    _k(block, "apr_basis", f"labpage.arm.{aid}.aprBasis")
+    _k(block, "duration_basis", f"labpage.arm.{aid}.durationBasis")
+    _k(block, "recovery_denominator", f"labpage.arm.{aid}.recoveryDenominator")
+    _k(block, "apr_undefined_reason", "labpage.arm.aprUndefined")
+    if isinstance(block.get("repayment_target"), dict):
+        _k(block["repayment_target"], "label", f"labpage.arm.{aid}.targetLabel")
+        _k(block["repayment_target"], "basis", f"labpage.arm.{aid}.capBasis")
+    return block
+
+
+def _keyed_assumptions() -> list:
+    """ASSUMPTIONS as `[{text, text_key}]`, emitted BESIDE the string list.
+
+    The existing `assumptions` field keeps its plain strings so a consumer that
+    never learns about the keys is unaffected; this list carries the same items
+    in the same order with a key attached.
+    """
+    return [{"text": a, "text_key": f"labpage.assumption.{i}"}
+            for i, a in enumerate(ASSUMPTIONS)]
+
+
+def _keyed_glossary() -> list:
+    """GLOSSARY as an ordered list, both the term and its definition keyed.
+
+    The dict form is kept under `glossary`; the term is itself reader-facing
+    copy, so it needs a key of its own rather than being treated as an id.
+    """
+    out = []
+    for i, (term, text) in enumerate(GLOSSARY.items()):
+        out.append({"term": term, "term_key": f"labpage.glossary.{i}.term",
+                    "text": text, "text_key": f"labpage.glossary.{i}.text"})
+    return out
+
+
+def _keyed_taxonomy() -> dict:
+    out = {}
+    for cls, body in CLAIM_TAXONOMY.items():
+        item = dict(body)
+        _k(item, "label", f"labpage.taxonomy.{cls}.label")
+        _k(item, "meaning", f"labpage.taxonomy.{cls}.meaning")
+        out[cls] = item
+    return out
+
+
+def _keyed_metric_definitions() -> dict:
+    """METRIC_DEFINITIONS with a translation key beside each prose field.
+
+    The English values are returned unchanged; only sibling `*_key` entries are
+    added, so an existing consumer reading `definition` is unaffected.
+    """
+    out = {}
+    for metric, body in METRIC_DEFINITIONS.items():
+        item = dict(body)
+        for field in ("definition", "why", "caveat"):
+            _k(item, field, f"labpage.metric.{metric}.{field}")
+        out[metric] = item
+    return out
 
 
 def comparison(scenario: str) -> Optional[dict]:
@@ -575,11 +749,14 @@ def comparison(scenario: str) -> Optional[dict]:
     if not arms:
         return None
     return {
-        "scenario": {"key": scenario, **SCENARIOS[scenario]},
+        "scenario": {"key": scenario, **SCENARIOS[scenario],
+                     "label_key": f"labpage.scenario.{scenario}.label",
+                     "description_key": f"labpage.scenario.{scenario}.description"},
         "arms": arms,
-        "metric_definitions": METRIC_DEFINITIONS,
+        "metric_definitions": _keyed_metric_definitions(),
         "findings": _findings(scenario, arms),
         "assumptions": ASSUMPTIONS,
+        "assumptions_keyed": _keyed_assumptions(),
         "caveats": caveats(),
         "summary": _summary(scenario, arms),
     }
@@ -615,6 +792,11 @@ def underreporting() -> Optional[dict]:
     full, least = rows[-1], rows[0]        # rows ascend by ω: [0]=lowest
     all_complete = all(not (r["incomplete_recovery_rate"] or 0) for r in rows)
     if all_complete:
+        observed_key = "labpage.finding.underreportingSweepComplete"
+        observed_params = {"fromMonths": f"{full['duration_months_mean']:.1f}",
+                           "toMonths": f"{least['duration_months_mean']:.1f}",
+                           "fromOmega": f"{full['omega']:.0%}",
+                           "toOmega": f"{least['omega']:.0%}"}
         observed = (
             f"In this sweep every path still reached the cap inside the "
             f"24-month window, so the total stayed at the cap and only the "
@@ -623,6 +805,8 @@ def underreporting() -> Optional[dict]:
             f"{full['omega']:.0%} → {least['omega']:.0%}. That is this "
             f"sweep's result, not a general guarantee.")
     else:
+        observed_key = "labpage.finding.underreportingSweepIncomplete"
+        observed_params = {}
         observed = (
             "In this sweep some paths did NOT reach the cap inside the "
             "24-month window, so the total is not invariant across all of "
@@ -637,6 +821,7 @@ def underreporting() -> Optional[dict]:
                               "observes; the underlying revenue shape is held "
                               "fixed. It is shown separately so it is not read "
                               "as one of the scenarios.",
+        "why_not_a_scenario_key": "labpage.under.whyNotScenario",
         # A list, and split by claim class on purpose. The invariance argument
         # is a property of the contract; the duration numbers are an output of
         # one sweep. Carrying both under a single "mathematical_property" label
@@ -653,11 +838,14 @@ def underreporting() -> Optional[dict]:
                         "reached: under-reporting severe enough to push the "
                         "contract past the horizon leaves the cap unreached "
                         "and the total short.",
+                "text_key": "labpage.finding.underreportingOwed",
                 "source": "research/DERIVATIONS.md",
             },
             {
                 "classification": "simulation_result",
                 "text": observed,
+                "text_key": observed_key,
+                "text_params": observed_params,
                 "source": "research/results/baseline_v3_canonical.json",
             },
         ],
@@ -839,8 +1027,21 @@ def caveats() -> List[dict]:
     at request time rather than baked into the constant, so the caveat cannot
     outlive the sweep it is describing.
     """
-    grid = _grid_pricing_sentence()
-    return [{**c, "text": c["text"].replace("{grid}", grid)} for c in CAVEATS]
+    g = _grid_pricing_parts()
+    out = []
+    for i, c in enumerate(CAVEATS):
+        item = {**c, "text": c["text"].replace("{grid}", g["text"])}
+        # Position is the only stable handle these constants carry, so the key
+        # is index-based and a test pins the count. The grid sentence travels
+        # as a translation KEY plus artifact-sourced figures -- not as finished
+        # English prose, which is how an English paragraph used to end up
+        # inside a Vietnamese caveat.
+        item["text_key"] = f"labpage.caveat.{i}"
+        if "{grid}" in c["text"]:
+            item["text_params"] = dict(g["params"])
+            item["text_param_keys"] = {"grid": g["key"]}
+        out.append(item)
+    return out
 
 
 def _summary(scenario: str, arms: List[dict]) -> dict:
@@ -850,22 +1051,114 @@ def _summary(scenario: str, arms: List[dict]) -> dict:
     fa, ill = by.get("FIX-A"), by.get("RBF-ILL")
     if not (fa and ill):
         return {}
-    faster = "the fixed arm" if fa["recovery_ratio"].get("12", 0) >= ill["recovery_ratio"].get("12", 0) \
-        else "the revenue-based arm"
-    _ = None
+    # NAME THE PAIR. This headline compares exactly two of the four arms --
+    # FIX-A against RBF-ILL -- and there are two fixed arms and two
+    # revenue-based arms on screen, so "the fixed arm" does not identify a row.
+    #
+    # And handle EQUALITY. `>=` used to select FIX-A at an exact tie and then
+    # assert it had recovered more, which is false. No currently registered
+    # scenario produces a tie (FIX-A sits at 0.923076923076923 in all thirteen
+    # while RBF-ILL ranges 0.443 to 1.0), so this was latent rather than live;
+    # it is fixed here rather than left for an artifact that produces one.
+    f12 = fa["recovery_ratio"].get("12", 0)
+    r12 = ill["recovery_ratio"].get("12", 0)
+
+    # WHETHER THE TARGETS DIFFER IS READ FROM THE TARGETS, not assumed. This
+    # pair happens to share a target -- both are the 1.20 cap on the same
+    # advance, so both are 222,000,000 VND in every registered scenario -- and
+    # for an equal target a larger share IS a larger amount. Saying otherwise
+    # was wrong. The branch is derived so it stays right if a future artifact
+    # prices them apart.
+    fa_target = _target_vnd(fa)
+    ill_target = _target_vnd(ill)
+    same_target = (fa_target is not None and fa_target == ill_target)
+
+    if f12 == r12:
+        faster, faster_key = "both contracts", "labpage.armRef.both"
+        sentence_key = ("labpage.summary.sentenceLevelSameTarget" if same_target
+                        else "labpage.summary.sentenceLevel")
+    elif f12 > r12:
+        faster, faster_key = FIX_A_REF, "labpage.armRef.FIX-A"
+        sentence_key = ("labpage.summary.sentenceSameTarget" if same_target
+                        else "labpage.summary.sentence")
+    else:
+        faster, faster_key = RBF_ILL_REF, "labpage.armRef.RBF-ILL"
+        sentence_key = ("labpage.summary.sentenceSameTarget" if same_target
+                        else "labpage.summary.sentence")
+
+    # The English built here is the fallback a reader sees when no catalogue
+    # entry resolves, so it must say exactly what the catalogue entry for the
+    # same branch says -- including in the tie case, where "the same share is
+    # the same amount" is the precise statement and "compare like for like"
+    # is not.
+    tied = (f12 == r12)
+    target_display = fa["repayment_target"]["amount"]["display"]
+    if same_target and tied:
+        target_clause = f" Both target {target_display}, so the same share is the same amount."
+    elif same_target:
+        target_clause = f" Both target {target_display}, so the two percentages compare like for like."
+    elif tied:
+        target_clause = " The two targets differ, so the same share is not the same amount."
+    else:
+        target_clause = (" The two targets differ, so this is not a comparison "
+                         "of amounts recovered.")
     return {
         "scenario_label": SCENARIOS[scenario]["label"],
+        "scenario_label_key": f"labpage.scenario.{scenario}.label",
         "peak_burden_fixed": fa["burden"]["max"],
         "peak_burden_rbf": ill["burden"]["max"],
         "recovery12_fixed": fa["recovery_ratio"].get("12"),
         "recovery12_rbf": ill["recovery_ratio"].get("12"),
         "incomplete_rbf": ill["incomplete_recovery_rate"],
         "faster_by_month_12": faster,
-        "sentence": (f"In this scenario, peak payment burden reaches "
-                     f"{fa['burden']['max']:.1%} under the fixed arm against "
-                     f"{ill['burden']['max']:.1%} under the revenue-based arm, "
-                     f"and {faster} has recovered more by month 12."),
+        "compared_pair": ["FIX-A", "RBF-ILL"],
+        "same_target": same_target,
+        "sentence": (
+            f"Comparing {FIX_A_REF} with {RBF_ILL_REF}: peak payment burden "
+            f"reaches {fa['burden']['max']:.1%} against "
+            f"{ill['burden']['max']:.1%}, and by month 12 "
+            + ("both have recovered the same share of their repayment "
+               "target." if tied else
+               f"{faster} has recovered a larger share of its repayment "
+               "target.")
+            + target_clause),
+        "sentence_key": sentence_key,
+        "sentence_params": {"fixedPct": f"{fa['burden']['max']:.1%}",
+                            "rbfPct": f"{ill['burden']['max']:.1%}",
+                            "target": fa["repayment_target"]["amount"]["display"]},
+        "sentence_param_keys": {"fixedArm": "labpage.armRef.FIX-A",
+                                "rbfArm": "labpage.armRef.RBF-ILL",
+                                "faster": faster_key},
     }
+
+
+def _rate_parts(rates_equal, eq, ill, eq_defined, scenario, has_window_note):
+    """Translatable sentences for the composed rate finding.
+
+    The English `text` beside this is unchanged and remains authoritative for
+    existing consumers. Numbers travel as parameters so a translated sentence
+    cannot drift from the artifact it describes.
+    """
+    parts = [{
+        "key": ("labpage.finding.ratesEqual" if rates_equal
+                else "labpage.finding.priceStructureSeparable"),
+        "params": ({"rbfRate": f"{ill['effective_apr']:.2%}"} if rates_equal else
+                   {"eqRate": f"{eq['effective_apr']:.2%}",
+                    "illRate": f"{ill['effective_apr']:.2%}",
+                    "definedPct": f"{eq_defined:.1%}"}),
+        "param_keys": {"scenario": f"labpage.scenario.{scenario}.label"},
+    }]
+    differs = abs(eq["completed_share"] - ill["completed_share"]) > 1e-9
+    parts.append({
+        "key": ("labpage.finding.completionDiffers" if differs
+                else "labpage.finding.completionSame"),
+        "params": {"eqPct": f"{eq['completed_share']:.1%}",
+                   "illPct": f"{ill['completed_share']:.1%}"},
+        "param_keys": {},
+    })
+    if has_window_note:
+        parts.append({"key": "labpage.finding.windowNote", "params": {}, "param_keys": {}})
+    return parts
 
 
 def _findings(scenario: str, arms: List[dict]) -> List[dict]:
@@ -887,6 +1180,7 @@ def _findings(scenario: str, arms: List[dict]) -> List[dict]:
                  "net-sales/GMV ratio is fixed. Most registered scenarios hold "
                  "that ratio fixed; `returns_spike` is the explicit exception "
                  "where the displayed burden moves.",
+         "text_key": "labpage.finding.burdenDenominator",
          "source": "research/DERIVATIONS.md"},
         {"classification": "mathematical_property",
          "text": "A fixed instalment does not adjust, so its burden rises in "
@@ -898,6 +1192,7 @@ def _findings(scenario: str, arms: List[dict]) -> List[dict]:
                  "whether the contract is ultimately repaid: where revenue stops "
                  "before the cap is reached, a balance goes unrecovered. The "
                  "trade is timing, not forgiveness — and not immunity.",
+         "text_key": "labpage.finding.fixedBurdenInverse",
          "source": "research/DERIVATIONS.md"},
     ]
 
@@ -909,17 +1204,47 @@ def _findings(scenario: str, arms: List[dict]) -> List[dict]:
             "text": (f"In the {label} scenario, the cost-matched fixed arm reaches "
                      f"a peak payment burden of {fa['burden']['max']:.1%}, against "
                      f"{ill['burden']['max']:.1%} for the revenue-based arm."),
+            "text_key": "labpage.finding.peakBurden",
+            "text_params": {"fixedPct": f"{fa['burden']['max']:.1%}",
+                            "rbfPct": f"{ill['burden']['max']:.1%}"},
+            "text_param_keys": {"scenario": f"labpage.scenario.{scenario}.label"},
             "source": fa["source_artifact"]})
 
         f12, r12 = fa["recovery_ratio"].get("12", 0), ill["recovery_ratio"].get("12", 0)
-        direction = "ahead of" if f12 >= r12 else "behind"
+        # Same equality correction as _summary: an exact tie is "level with",
+        # not "ahead of".
+        if f12 == r12:
+            direction, direction_key = "level with", "labpage.finding.direction.level"
+        elif f12 > r12:
+            direction, direction_key = "ahead of", "labpage.finding.direction.ahead"
+        else:
+            direction, direction_key = "behind", "labpage.finding.direction.behind"
         out.append({
             "classification": "simulation_result",
-            "text": (f"In the {label} scenario, provider recovery by month 12 is "
-                     f"{f12:.1%} for the fixed arm and {r12:.1%} for the "
-                     f"revenue-based arm — the fixed arm is {direction} the "
-                     f"revenue-based arm here. This ordering is a property of "
-                     f"this scenario and does not hold across all of them."),
+            # Same correction as the headline: read whether the targets match
+            # rather than asserting that they differ.
+            "text": (f"In the {label} scenario, recovery by month 12 reaches "
+                     f"{f12:.1%} of target for {FIX_A_REF} and "
+                     f"{r12:.1%} of target for {RBF_ILL_REF} — so "
+                     f"{FIX_A_REF} is {direction} {RBF_ILL_REF} here. "
+                     + (f"Both target {fa['repayment_target']['amount']['display']}, "
+                        f"so these percentages compare like for like."
+                        if _target_vnd(fa) is not None
+                        and _target_vnd(fa) == _target_vnd(ill)
+                        else "The two targets differ, so this is not a "
+                             "comparison of amounts recovered.")
+                     + f" This ordering is a property of this scenario and does "
+                       f"not hold across all of them."),
+            "text_key": ("labpage.finding.recovery12SameTarget"
+                         if _target_vnd(fa) is not None
+                         and _target_vnd(fa) == _target_vnd(ill)
+                         else "labpage.finding.recovery12"),
+            "text_params": {"fixedPct": f"{f12:.1%}", "rbfPct": f"{r12:.1%}",
+                            "target": fa["repayment_target"]["amount"]["display"]},
+            "text_param_keys": {"scenario": f"labpage.scenario.{scenario}.label",
+                                "direction": direction_key,
+                                "fixedArm": "labpage.armRef.FIX-A",
+                                "rbfArm": "labpage.armRef.RBF-ILL"},
             "source": ill["source_artifact"]})
 
         if ill["incomplete_recovery_rate"] > 0:
@@ -930,6 +1255,9 @@ def _findings(scenario: str, arms: List[dict]) -> List[dict]:
                          f"paths do not reach the repayment target within the "
                          f"24-month window. That is censoring under this "
                          f"scenario's revenue path, not a modelled default."),
+                "text_key": "labpage.finding.incompleteRecovery",
+                "text_params": {"pct": f"{ill['incomplete_recovery_rate']:.1%}"},
+                "text_param_keys": {"scenario": f"labpage.scenario.{scenario}.label"},
                 "source": ill["source_artifact"]})
 
     if eq and ill and eq["effective_apr"] is not None and ill["effective_apr"] is not None:
@@ -995,6 +1323,11 @@ def _findings(scenario: str, arms: List[dict]) -> List[dict]:
             out.append({
                 "classification": "sensitivity_result",
                 "text": f"{body} {completion_note}{window_note}",
+                # Each sentence is its own translatable unit: a denominator or a
+                # selection caveat mistranslated inside a larger block would assert
+                # something the artifact does not support.
+                "text_parts": _rate_parts(rates_equal, eq, ill, eq_defined,
+                                          scenario, bool(window_note)),
                 "source": eq["source_artifact"]})
         else:
             out.append({
@@ -1040,11 +1373,13 @@ def _findings(scenario: str, arms: List[dict]) -> List[dict]:
                 "longer would state one scenario's direction as a property "
                 "of the structure. Which side of that trade is worth taking "
                 "is a commercial judgement this study does not make.",
+        "text_key": "labpage.finding.contractualVsDisplayed",
         "source": "author"})
     out.append({
         "classification": "open_real_world_question",
         "text": "Whether real sellers would repay on these paths, and at what "
                 "default rate, cannot be answered here. It needs observed revenue "
                 "and adjudicated repayment outcomes.",
+        "text_key": "labpage.finding.openQuestion",
         "source": "research/CORRECTED_CLAIMS.md"})
     return out
