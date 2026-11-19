@@ -366,5 +366,17 @@ def test_uncensored_arm_shows_no_spurious_qualifier(server, browser):
     # The unqualified labels, since every path completes and every path has a
     # rate.
     assert "Mean simulated APR" in arms_text and "Mean duration" in arms_text
-    assert "completed paths only" not in pg.inner_text("#dur-table")
+
+    # The settlement table lives in its own section, which also ships closed.
+    # Asserting the qualifier's ABSENCE against a collapsed panel would pass
+    # for the wrong reason -- `inner_text` returns "" either way -- so the
+    # section is opened and confirmed to render before the negative check.
+    pg.evaluate("document.querySelector('#s-dur details.panel').open = true")
+    pg.wait_for_timeout(200)
+    dur_table = pg.inner_text("#dur-table")
+    assert dur_table.strip(), "the settlement section rendered no visible text"
+    # the headers are CSS-uppercased, so compare case-insensitively, as the
+    # censored-scenario test above already does
+    assert "mean duration" in dur_table.lower()   # the table really is rendered
+    assert "completed paths only" not in dur_table.lower()
     pg.close()
